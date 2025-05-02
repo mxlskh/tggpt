@@ -1,1 +1,1 @@
-# ChatGPT Telegram Bot
+# AI Assistant for IELTS based on OpenAI. 
