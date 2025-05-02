@@ -13,11 +13,6 @@ def main():
     load_dotenv()
     print("TELEGRAM_BOT_TOKEN =", os.getenv("TELEGRAM_BOT_TOKEN"))
     print("OPENAI_API_KEY =", os.getenv("OPENAI_API_KEY"))
-    print("DEBUG: вся env:")
-    for key in os.environ:
-        if "TELEGRAM" in key:
-            print(key, "=", os.environ[key])
-
 
     # Setup logging
     logging.basicConfig(
