@@ -11,11 +11,6 @@ from telegram_bot import ChatGPTTelegramBot
 def main():
     # Read .env file
     load_dotenv()
-    print("TELEGRAM_BOT_TOKEN =", os.getenv("TELEGRAM_BOT_TOKEN"))
-    print("OPENAI_API_KEY =", os.getenv("OPENAI_API_KEY"))
-    import pprint
-    pprint.pprint(dict(os.environ))  # выведет все переменные окружения
-
 
     # Setup logging
     logging.basicConfig(
