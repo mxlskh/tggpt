@@ -14,3 +14,8 @@ A [Telegram bot](https://t.me/Language_assistant1_bot) that integrates with Open
 
 ## Disclaimer
 This is a personal project and is not affiliated with OpenAI in any way.
+
+## License
+
+This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
+
