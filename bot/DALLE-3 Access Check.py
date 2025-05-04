@@ -1,16 +1,16 @@
 import os
+from openai import OpenAI
 from dotenv import load_dotenv
-import openai
 
 load_dotenv()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-response = openai.Image.create(
+response = client.images.generate(
+    model="dall-e-3",
     prompt="A futuristic city skyline at sunset",
-    n=1,
-    size="512x512"
+    size="1024x1024",
+    quality="standard",
+    n=1
 )
 
-image_url = response["data"][0]["url"]
-print("Image URL:", image_url)
+print(response.data[0].url)
