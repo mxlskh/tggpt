@@ -5,6 +5,8 @@
 ![docker](https://img.shields.io/badge/Docker-bot?style=flat&logo=docker&logoColor=%23FF007F&color=000000)
 ![PublishPassed](https://img.shields.io/badge/Passed-bot?style=flat&logo=GitHub&logoColor=%23ffffff&label=Publish%20Docker%20Image&labelColor=000000)
 [![openai-version](https://img.shields.io/badge/1.58-Bot?style=flat&logo=openai&logoColor=ffffffffffff&logoSize=auto&label=OpenAI&labelColor=000000&color=BABEFF)](https://openai.com/)
+![Railway](https://img.shields.io/badge/Railway-Bot?style=flat&logo=Railway&logoColor=babeff&logoSize=auto&labelColor=000000&color=000000)
+
 
 A [Telegram bot](https://t.me/Language_assistant1_bot) that integrates with OpenAI's _official_ [ChatGPT](https://openai.com/blog/chatgpt/), [DALL·E](https://openai.com/product/dall-e-2) and [Whisper](https://openai.com/research/whisper) APIs to provide answers.
 
