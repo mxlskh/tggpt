@@ -1,8 +1,9 @@
 # Telegram AI Assistant based on ChatGPT by OpenAI. 
-![Static Badge](https://img.shields.io/badge/Telegram-bot?style=flat&logo=Telegram&logoColor=%2324A1DE&color=000000)
-
-[![license](https://img.shields.io/badge/License-GPL%202.0-brightgreen.svg)](LICENSE)
-[![Publish Docker image](https://github.com/n3d1117/chatgpt-telegram-bot/actions/workflows/publish.yaml/badge.svg)](https://github.com/n3d1117/chatgpt-telegram-bot/actions/workflows/publish.yaml)
+![telegram](https://img.shields.io/badge/Telegram-bot?style=flat&logo=Telegram&logoColor=%2324A1DE&color=000000)
+![python](https://img.shields.io/badge/Python-bot?style=flat&logo=python&logoColor=%23ffffff&color=000000)
+![docker](https://img.shields.io/badge/Docker-bot?style=flat&logo=docker&logoColor=%23FF007F&color=000000)
+![GPL2.0](https://img.shields.io/badge/GPL2.0-bot?style=flat&logo=gpl&logoColor=%23FF007F&label=License&color=000000)
+![PublishPassed](https://img.shields.io/badge/Passed-bot?style=flat&logo=GitHub&logoColor=%23ffffff&label=Publish%20Docker%20Image&labelColor=000000)
 
 A [Telegram bot](https://t.me/Language_assistant1_bot) that integrates with OpenAI's _official_ [ChatGPT](https://openai.com/blog/chatgpt/), [DALL·E](https://openai.com/product/dall-e-2) and [Whisper](https://openai.com/research/whisper) APIs to provide answers.
 
