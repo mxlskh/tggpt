@@ -1,4 +1,5 @@
 # Telegram AI Assistant based on ChatGPT by OpenAI. 
+![GPL-2.0](https://img.shields.io/badge/GPL2.0-Bot?style=flat&logo=github&logoColor=ffffffffffff&logoSize=auto&label=License&labelColor=000000&color=FF0000&link=https%3A%2F%2Fgithub.com%2Fmxlskh%2Ftggpt%2Fblob%2Fmain%2FLICENSE)
 ![telegram](https://img.shields.io/badge/Telegram-bot?style=flat&logo=Telegram&logoColor=%2324A1DE&color=000000)
 ![python](https://img.shields.io/badge/Python-bot?style=flat&logo=python&logoColor=%23ffffff&color=000000)
 ![docker](https://img.shields.io/badge/Docker-bot?style=flat&logo=docker&logoColor=%23FF007F&color=000000)
