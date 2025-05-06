@@ -1,69 +1,12 @@
 import logging
 import os
+
 from dotenv import load_dotenv
-from telegram import ReplyKeyboardMarkup, Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 from plugin_manager import PluginManager
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
 from telegram_bot import ChatGPTTelegramBot
 
-def start(update: Update, context: CallbackContext):
-    chat_id = update.message.chat.id
-    markup = ReplyKeyboardMarkup(
-        [['👩‍🎓 Ученик', '👨‍🏫 Преподаватель']],
-        resize_keyboard=True, one_time_keyboard=True
-    )
-    update.message.reply_text("Выбери свою роль:", reply_markup=markup)
-    user_state[chat_id] = {'step': 'role'}
-
-def handle_message(update: Update, context: CallbackContext):
-    chat_id = update.message.chat.id
-    text = update.message.text
-
-    if chat_id not in user_state:
-        update.message.reply_text("Пожалуйста, начни с команды /start.")
-        return
-
-    state = user_state[chat_id]
-
-    if state['step'] == 'role':
-        if text in ['👩‍🎓 Ученик', '👨‍🏫 Преподаватель']:
-            state['role'] = text
-            state['step'] = 'language'
-
-            markup = ReplyKeyboardMarkup(
-                [['🇬🇧 Английский', '🇩🇪 Немецкий']],
-                resize_keyboard=True, one_time_keyboard=True
-            )
-            update.message.reply_text("Выбери язык обучения:", reply_markup=markup)
-        else:
-            update.message.reply_text("Пожалуйста, выбери роль из предложенных.")
-
-    elif state['step'] == 'language':
-        if text in ['🇬🇧 Английский', '🇩🇪 Немецкий', '🇫🇷 Французский', '🇨🇳 Китайский']:
-            state['language'] = text
-            state['step'] = 'goal'
-
-            markup = ReplyKeyboardMarkup(
-                [['📚 Грамматика', '📖 Чтение'], ['👂 Аудирование', '🗣 Разговорная практика']],
-                resize_keyboard=True, one_time_keyboard=True
-            )
-            update.message.reply_text("Выбери цель обучения:", reply_markup=markup)
-        else:
-            update.message.reply_text("Пожалуйста, выбери язык из списка.")
-
-    elif state['step'] == 'goal':
-        state['goal'] = text
-        role = state.get('role')
-        language = state.get('language')
-        goal = state.get('goal')
-
-        update.message.reply_text(
-            f"✅ Готово!\n\nРоль: {role}\nЯзык: {language}\nЦель: {goal}\n\nТы можешь начать работу, используя /help или другие команды."
-        )
-
-        user_state.pop(chat_id)  # Сбросить состояние
 
 def main():
     # Read .env file
@@ -163,19 +106,12 @@ def main():
         'plugins': os.environ.get('PLUGINS', '').split(',')
     }
 
+    # Setup and run ChatGPT and Telegram bot
     plugin_manager = PluginManager(config=plugin_config)
     openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager)
     telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
-    
-    # Adding message handlers for role selection
-    updater = Updater(token=telegram_config['token'], use_context=True)
-    dispatcher = updater.dispatcher
-    dispatcher.add_handler(CommandHandler('start', start))
-    dispatcher.add_handler(MessageHandler(Filters.text, handle_message))
-
     telegram_bot.run()
 
+
 if __name__ == '__main__':
-    user_state = {}  # Store user states (role, language, goal)
     main()
-    
