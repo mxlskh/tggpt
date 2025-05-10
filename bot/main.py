@@ -41,7 +41,7 @@ def main():
         'max_tokens': int(os.environ.get('MAX_TOKENS', max_tokens_default)),
         'n_choices': int(os.environ.get('N_CHOICES', 1)),
         'temperature': float(os.environ.get('TEMPERATURE', 1.0)),
-        'image_model': os.environ.get('IMAGE_MODEL', 'gpt-image-1'),
+        'image_model': os.environ.get('IMAGE_MODEL', 'dall-e-3'),
         'image_quality': os.environ.get('IMAGE_QUALITY', 'HD'),
         'image_style': os.environ.get('IMAGE_STYLE', 'natural'),
         'image_size': os.environ.get('IMAGE_SIZE', '1024x1024'),
