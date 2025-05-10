@@ -1,3 +1,5 @@
+
+from telegram import ReplyKeyboardMarkup
 from __future__ import annotations
 
 import asyncio
@@ -1084,3 +1086,53 @@ class ChatGPTTelegramBot:
         application.add_error_handler(error_handler)
 
         application.run_polling()
+
+
+
+async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # исходное сообщение помощи
+    help_text = (
+        "Это Telegram-бот, использующий ChatGPT. "
+        "Он умеет отвечать на вопросы, генерировать изображения и работать с голосом.\n\n"
+        "Давай начнём!"
+    )
+    keyboard = [
+        [InlineKeyboardButton("Давай начнём", callback_data="start_dialog")]
+    ]
+    await update.message.reply_text(help_text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    keyboard = [
+        [InlineKeyboardButton("Преподаватель", callback_data="role_teacher")],
+        [InlineKeyboardButton("Ученик", callback_data="role_student")]
+    ]
+    await query.edit_message_text("Выберите, кто вы:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def choose_teacher_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    keyboard = [[InlineKeyboardButton(lang, callback_data=f"teacher_lang_{lang.lower()}")]
+                for lang in ["Английский", "Китайский", "Французский", "Немецкий", "Итальянский", "Польский"]]
+    await query.edit_message_text("Выберите язык преподавания:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def choose_student_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    keyboard = [[InlineKeyboardButton(lang, callback_data=f"student_lang_{lang.lower()}")]
+                for lang in ["Английский", "Китайский", "Французский", "Немецкий", "Итальянский", "Польский"]]
+    await query.edit_message_text("Выберите язык изучения:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def teacher_greeting(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "Привет! Ты можешь присылать сюда файлы, изображения и текст для проверки, просить сгенерировать задания на нужную тему, голосовые сообщения и другое.")
+
+async def student_greeting(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "Привет! Я могу давать материал для изучения, проверить твой уровень знаний, отправлять тесты и проверять их, генерировать голосовые сообщения для практики прослушки и принимать твои для практики разговора.")
+
