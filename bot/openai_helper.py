@@ -335,8 +335,8 @@ class OpenAIHelper:
                 n=1,
                 model=self.config['image_model'],
                 #quality=self.config['image_quality'],
-                style=self.config['image_style'],
-                size=self.config['image_size']
+                #style=self.config['image_style'],
+                #size=self.config['image_size']
             )
 
             if len(response.data) == 0:
