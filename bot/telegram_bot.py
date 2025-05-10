@@ -1,6 +1,6 @@
 
-from telegram import ReplyKeyboardMarkup
 from __future__ import annotations
+from telegram import ReplyKeyboardMarkup
 
 import asyncio
 import logging
