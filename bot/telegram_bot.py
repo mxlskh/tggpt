@@ -861,6 +861,43 @@ class ChatGPTTelegramBot:
         Handle the callback query from the inline query result
         """
         callback_data = update.callback_query.data
+        # Custom role/language selection
+        if callback_data == "start_dialog":
+            keyboard = [
+                [InlineKeyboardButton("Преподаватель", callback_data="role_teacher")],
+                [InlineKeyboardButton("Ученик", callback_data="role_student")]
+            ]
+            await update.callback_query.edit_message_text("Выберите, кто вы:", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+
+        elif callback_data == "role_teacher":
+            keyboard = [
+                [InlineKeyboardButton(lang, callback_data=f"teacher_lang_{lang.lower()}")]
+                for lang in ["Английский", "Китайский", "Французский", "Немецкий", "Итальянский", "Польский"]
+            ]
+            await update.callback_query.edit_message_text("Выберите язык преподавания:", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+
+        elif callback_data == "role_student":
+            keyboard = [
+                [InlineKeyboardButton(lang, callback_data=f"student_lang_{lang.lower()}")]
+                for lang in ["Английский", "Китайский", "Французский", "Немецкий", "Итальянский", "Польский"]
+            ]
+            await update.callback_query.edit_message_text("Выберите язык изучения:", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+
+        elif callback_data.startswith("teacher_lang_"):
+            await update.callback_query.edit_message_text(
+                "Привет! Ты можешь присылать сюда файлы, изображения и тексты для проверки, просить сгенерировать задания на нужную тему, голосовые сообщения и другое."
+            )
+            return
+
+        elif callback_data.startswith("student_lang_"):
+            await update.callback_query.edit_message_text(
+                "Привет! Я могу давать материал для изучения, проверить твой уровень знаний, отправлять тесты и проверять их, генерировать голосовые сообщения для практики прослушки и принимать твои для практики разговора."
+            )
+            return
+
         user_id = update.callback_query.from_user.id
         inline_message_id = update.callback_query.inline_message_id
         name = update.callback_query.from_user.name
@@ -1089,50 +1126,26 @@ class ChatGPTTelegramBot:
 
 
 
-async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # исходное сообщение помощи
-    help_text = (
-        "Это Telegram-бот, использующий ChatGPT. "
-        "Он умеет отвечать на вопросы, генерировать изображения и работать с голосом.\n\n"
-        "Давай начнём!"
-    )
-    keyboard = [
-        [InlineKeyboardButton("Давай начнём", callback_data="start_dialog")]
-    ]
-    await update.message.reply_text(help_text, reply_markup=InlineKeyboardMarkup(keyboard))
+    async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        """
+        Shows the help menu and a button to start dialog.
+        """
+        commands = self.group_commands if is_group_chat(update) else self.commands
+        bot_language = self.config['bot_language']
+        commands_description = [f'/{command.command} - {command.description}' for command in commands]
+        help_localized = localized_text('help_text', bot_language)
 
-async def start_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    keyboard = [
-        [InlineKeyboardButton("Преподаватель", callback_data="role_teacher")],
-        [InlineKeyboardButton("Ученик", callback_data="role_student")]
-    ]
-    await query.edit_message_text("Выберите, кто вы:", reply_markup=InlineKeyboardMarkup(keyboard))
+        help_text = (
+            help_localized[0] +
+            '\n\n' +
+            '\n'.join(commands_description) +
+            '\n\n' +
+            help_localized[1] +
+            '\n\n' +
+            (help_localized[2] if len(help_localized) > 2 else '')
+        )
 
-async def choose_teacher_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    keyboard = [[InlineKeyboardButton(lang, callback_data=f"teacher_lang_{lang.lower()}")]
-                for lang in ["Английский", "Китайский", "Французский", "Немецкий", "Итальянский", "Польский"]]
-    await query.edit_message_text("Выберите язык преподавания:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def choose_student_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    keyboard = [[InlineKeyboardButton(lang, callback_data=f"student_lang_{lang.lower()}")]
-                for lang in ["Английский", "Китайский", "Французский", "Немецкий", "Итальянский", "Польский"]]
-    await query.edit_message_text("Выберите язык изучения:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def teacher_greeting(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text(
-        "Привет! Ты можешь присылать сюда файлы, изображения и текст для проверки, просить сгенерировать задания на нужную тему, голосовые сообщения и другое.")
-
-async def student_greeting(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text(
-        "Привет! Я могу давать материал для изучения, проверить твой уровень знаний, отправлять тесты и проверять их, генерировать голосовые сообщения для практики прослушки и принимать твои для практики разговора.")
-
+        keyboard = [
+            [InlineKeyboardButton("Давай начнём", callback_data="start_dialog")]
+        ]
+        await update.message.reply_text(help_text, reply_markup=InlineKeyboardMarkup(keyboard))
