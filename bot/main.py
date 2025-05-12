@@ -143,7 +143,12 @@ def main():
     # Запуск и настройка плагинов
     plugin_manager = PluginManager(config=plugin_config)
     openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager)
-    telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper, is_admin=is_admin, admin_keyboard=admin_keyboard, handle_admin_command=handle_admin_command)
+    telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
+
+    # Настроим обработчики для администрирования
+    telegram_bot.add_handlers([
+        # Добавьте сюда обработчики для команд и нажатий кнопок
+    ])
     
     # Запуск бота
     telegram_bot.run()
