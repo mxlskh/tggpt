@@ -3,9 +3,9 @@ import os
 from dotenv import load_dotenv
 from plugin_manager import PluginManager
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
-from telegram_bot import ChatGPTTelegramBot
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
 from collections import defaultdict
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 def main():
     # Загружаем переменные из .env
@@ -71,33 +71,6 @@ def main():
         'token': os.environ['TELEGRAM_BOT_TOKEN'],
         'admin_user_ids': os.environ.get('ADMIN_USER_IDS', '-').split(','),
         'allowed_user_ids': os.environ.get('ALLOWED_TELEGRAM_USER_IDS', '*'),
-        'enable_quoting': os.environ.get('ENABLE_QUOTING', 'true').lower() == 'true',
-        'enable_image_generation': os.environ.get('ENABLE_IMAGE_GENERATION', 'true').lower() == 'true',
-        'enable_transcription': os.environ.get('ENABLE_TRANSCRIPTION', 'true').lower() == 'true',
-        'enable_vision': os.environ.get('ENABLE_VISION', 'true').lower() == 'true',
-        'enable_tts_generation': os.environ.get('ENABLE_TTS_GENERATION', 'true').lower() == 'true',
-        'budget_period': os.environ.get('BUDGET_PERIOD', 'monthly').lower(),
-        'user_budgets': os.environ.get('USER_BUDGETS', os.environ.get('MONTHLY_USER_BUDGETS', '*')),
-        'guest_budget': float(os.environ.get('GUEST_BUDGET', os.environ.get('MONTHLY_GUEST_BUDGET', '100.0'))),
-        'stream': os.environ.get('STREAM', 'true').lower() == 'true',
-        'proxy': os.environ.get('PROXY', None) or os.environ.get('TELEGRAM_PROXY', None),
-        'voice_reply_transcript': os.environ.get('VOICE_REPLY_WITH_TRANSCRIPT_ONLY', 'false').lower() == 'true',
-        'voice_reply_prompts': os.environ.get('VOICE_REPLY_PROMPTS', '').split(';'),
-        'ignore_group_transcriptions': os.environ.get('IGNORE_GROUP_TRANSCRIPTIONS', 'true').lower() == 'true',
-        'ignore_group_vision': os.environ.get('IGNORE_GROUP_VISION', 'true').lower() == 'true',
-        'group_trigger_keyword': os.environ.get('GROUP_TRIGGER_KEYWORD', ''),
-        'token_price': float(os.environ.get('TOKEN_PRICE', 0.002)),
-        'image_prices': [float(i) for i in os.environ.get('IMAGE_PRICES', "0.016,0.018,0.02").split(",")],
-        'vision_token_price': float(os.environ.get('VISION_TOKEN_PRICE', '0.01')),
-        'image_receive_mode': os.environ.get('IMAGE_FORMAT', "photo"),
-        'tts_model': os.environ.get('TTS_MODEL', 'tts-1'),
-        'tts_prices': [float(i) for i in os.environ.get('TTS_PRICES', "0.015,0.030").split(",")],
-        'transcription_price': float(os.environ.get('TRANSCRIPTION_PRICE', 0.006)),
-        'bot_language': os.environ.get('BOT_LANGUAGE', 'ru'),
-    }
-
-    plugin_config = {
-        'plugins': os.environ.get('PLUGINS', '').split(',')
     }
 
     # Список пользователей
@@ -119,7 +92,7 @@ def main():
         return InlineKeyboardMarkup(keyboard)
 
     # Обработка нажатия кнопок
-    def handle_admin_command(update, context):
+    def handle_admin_command(update: Update, context: CallbackContext):
         query = update.callback_query
         user_id = update.effective_user.id
 
@@ -140,18 +113,16 @@ def main():
     def view_pending_requests():
         return "\n".join([f"Request from {user_id}" for user_id in pending_requests])
 
-    # Запуск и настройка плагинов
-    plugin_manager = PluginManager(config=plugin_config)
-    openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager)
-    telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
+    # Создаем Updater и Dispatcher
+    updater = Updater(telegram_config['token'], use_context=True)
+    dispatcher = updater.dispatcher
 
-    # Настроим обработчики для администрирования
-    telegram_bot.add_handlers([
-        # Добавьте сюда обработчики для команд и нажатий кнопок
-    ])
-    
+    # Регистрация обработчиков команд и кнопок
+    dispatcher.add_handler(CallbackQueryHandler(handle_admin_command))
+
     # Запуск бота
-    telegram_bot.run()
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == '__main__':
     main()
