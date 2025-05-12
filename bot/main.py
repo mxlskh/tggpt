@@ -1,31 +1,32 @@
 import logging
 import os
+
 from dotenv import load_dotenv
+
 from plugin_manager import PluginManager
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
-from collections import defaultdict
+from telegram_bot import ChatGPTTelegramBot
+
 
 def main():
-    # Загружаем переменные из .env
+    # Read .env file
     load_dotenv()
 
-    # Настройка логирования
+    # Setup logging
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         level=logging.INFO
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
-    # Проверка обязательных переменных окружения
+    # Check if the required environment variables are set
     required_values = ['TELEGRAM_BOT_TOKEN', 'OPENAI_API_KEY']
     missing_values = [value for value in required_values if os.environ.get(value) is None]
     if len(missing_values) > 0:
         logging.error(f'The following environment values are missing in your .env: {", ".join(missing_values)}')
         exit(1)
 
-    # Конфигурация для OpenAI
+    # Setup configurations
     model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
     functions_available = are_functions_available(model=model)
     max_tokens_default = default_max_tokens(model=model)
@@ -65,64 +66,52 @@ def main():
         logging.error(f'ENABLE_FUNCTIONS is set to true, but the model {model} does not support it. '
                         'Please set ENABLE_FUNCTIONS to false or use a model that supports it.')
         exit(1)
+    if os.environ.get('MONTHLY_USER_BUDGETS') is not None:
+        logging.warning('The environment variable MONTHLY_USER_BUDGETS is deprecated. '
+                        'Please use USER_BUDGETS with BUDGET_PERIOD instead.')
+    if os.environ.get('MONTHLY_GUEST_BUDGET') is not None:
+        logging.warning('The environment variable MONTHLY_GUEST_BUDGET is deprecated. '
+                        'Please use GUEST_BUDGET with BUDGET_PERIOD instead.')
 
-    # Конфигурация для Telegram
     telegram_config = {
         'token': os.environ['TELEGRAM_BOT_TOKEN'],
-        'admin_user_ids': os.environ.get('ADMIN_USER_IDS', '-').split(','),
+        'admin_user_ids': os.environ.get('ADMIN_USER_IDS', '-'),
         'allowed_user_ids': os.environ.get('ALLOWED_TELEGRAM_USER_IDS', '*'),
+        'enable_quoting': os.environ.get('ENABLE_QUOTING', 'true').lower() == 'true',
+        'enable_image_generation': os.environ.get('ENABLE_IMAGE_GENERATION', 'true').lower() == 'true',
+        'enable_transcription': os.environ.get('ENABLE_TRANSCRIPTION', 'true').lower() == 'true',
+        'enable_vision': os.environ.get('ENABLE_VISION', 'true').lower() == 'true',
+        'enable_tts_generation': os.environ.get('ENABLE_TTS_GENERATION', 'true').lower() == 'true',
+        'budget_period': os.environ.get('BUDGET_PERIOD', 'monthly').lower(),
+        'user_budgets': os.environ.get('USER_BUDGETS', os.environ.get('MONTHLY_USER_BUDGETS', '*')),
+        'guest_budget': float(os.environ.get('GUEST_BUDGET', os.environ.get('MONTHLY_GUEST_BUDGET', '100.0'))),
+        'stream': os.environ.get('STREAM', 'true').lower() == 'true',
+        'proxy': os.environ.get('PROXY', None) or os.environ.get('TELEGRAM_PROXY', None),
+        'voice_reply_transcript': os.environ.get('VOICE_REPLY_WITH_TRANSCRIPT_ONLY', 'false').lower() == 'true',
+        'voice_reply_prompts': os.environ.get('VOICE_REPLY_PROMPTS', '').split(';'),
+        'ignore_group_transcriptions': os.environ.get('IGNORE_GROUP_TRANSCRIPTIONS', 'true').lower() == 'true',
+        'ignore_group_vision': os.environ.get('IGNORE_GROUP_VISION', 'true').lower() == 'true',
+        'group_trigger_keyword': os.environ.get('GROUP_TRIGGER_KEYWORD', ''),
+        'token_price': float(os.environ.get('TOKEN_PRICE', 0.002)),
+        'image_prices': [float(i) for i in os.environ.get('IMAGE_PRICES', "0.016,0.018,0.02").split(",")],
+        'vision_token_price': float(os.environ.get('VISION_TOKEN_PRICE', '0.01')),
+        'image_receive_mode': os.environ.get('IMAGE_FORMAT', "photo"),
+        'tts_model': os.environ.get('TTS_MODEL', 'tts-1'),
+        'tts_prices': [float(i) for i in os.environ.get('TTS_PRICES', "0.015,0.030").split(",")],
+        'transcription_price': float(os.environ.get('TRANSCRIPTION_PRICE', 0.006)),
+        'bot_language': os.environ.get('BOT_LANGUAGE', 'ru'),
     }
 
-    # Список пользователей
-    users = defaultdict(dict)
-    pending_requests = set()  # Множество для заявок на вступление
-    blocked_users = set()  # Множество для заблокированных пользователей
+    plugin_config = {
+        'plugins': os.environ.get('PLUGINS', '').split(',')
+    }
 
-    # Функция для проверки прав администратора
-    def is_admin(user_id):
-        return str(user_id) in telegram_config['admin_user_ids']
+    # Setup and run ChatGPT and Telegram bot
+    plugin_manager = PluginManager(config=plugin_config)
+    openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager)
+    telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
+    telegram_bot.run()
 
-    # Функция для создания Inline клавиатуры
-    def admin_keyboard():
-        keyboard = [
-            [InlineKeyboardButton("Просмотр пользователей", callback_data='view_users')],
-            [InlineKeyboardButton("Просмотр заявок", callback_data='view_pending_requests')],
-            [InlineKeyboardButton("Блокировка пользователей", callback_data='block_user')],
-        ]
-        return InlineKeyboardMarkup(keyboard)
-
-    # Обработка нажатия кнопок
-    def handle_admin_command(update: Update, context: CallbackContext):
-        query = update.callback_query
-        user_id = update.effective_user.id
-
-        if is_admin(user_id):
-            if query.data == 'view_users':
-                query.answer(text=view_users())
-            elif query.data == 'view_pending_requests':
-                query.answer(text=view_pending_requests())
-            elif query.data == 'block_user':
-                query.answer(text="Введите ID пользователя для блокировки.")
-        else:
-            query.answer(text="У вас нет прав администратора.")
-
-    # Функции для администрирования
-    def view_users():
-        return "\n".join([f"User {user_id}" for user_id in users])
-
-    def view_pending_requests():
-        return "\n".join([f"Request from {user_id}" for user_id in pending_requests])
-
-    # Создаем Updater и Dispatcher
-    updater = Updater(telegram_config['token'], use_context=True)
-    dispatcher = updater.dispatcher
-
-    # Регистрация обработчиков команд и кнопок
-    dispatcher.add_handler(CallbackQueryHandler(handle_admin_command))
-
-    # Запуск бота
-    updater.start_polling()
-    updater.idle()
 
 if __name__ == '__main__':
     main()
