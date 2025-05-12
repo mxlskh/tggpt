@@ -1,32 +1,31 @@
 import logging
 import os
-
 from dotenv import load_dotenv
-
 from plugin_manager import PluginManager
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
 from telegram_bot import ChatGPTTelegramBot
-
+from collections import defaultdict
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 def main():
-    # Read .env file
+    # Загружаем переменные из .env
     load_dotenv()
 
-    # Setup logging
+    # Настройка логирования
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         level=logging.INFO
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
-    # Check if the required environment variables are set
+    # Проверка обязательных переменных окружения
     required_values = ['TELEGRAM_BOT_TOKEN', 'OPENAI_API_KEY']
     missing_values = [value for value in required_values if os.environ.get(value) is None]
     if len(missing_values) > 0:
         logging.error(f'The following environment values are missing in your .env: {", ".join(missing_values)}')
         exit(1)
 
-    # Setup configurations
+    # Конфигурация для OpenAI
     model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
     functions_available = are_functions_available(model=model)
     max_tokens_default = default_max_tokens(model=model)
@@ -66,16 +65,11 @@ def main():
         logging.error(f'ENABLE_FUNCTIONS is set to true, but the model {model} does not support it. '
                         'Please set ENABLE_FUNCTIONS to false or use a model that supports it.')
         exit(1)
-    if os.environ.get('MONTHLY_USER_BUDGETS') is not None:
-        logging.warning('The environment variable MONTHLY_USER_BUDGETS is deprecated. '
-                        'Please use USER_BUDGETS with BUDGET_PERIOD instead.')
-    if os.environ.get('MONTHLY_GUEST_BUDGET') is not None:
-        logging.warning('The environment variable MONTHLY_GUEST_BUDGET is deprecated. '
-                        'Please use GUEST_BUDGET with BUDGET_PERIOD instead.')
 
+    # Конфигурация для Telegram
     telegram_config = {
         'token': os.environ['TELEGRAM_BOT_TOKEN'],
-        'admin_user_ids': os.environ.get('ADMIN_USER_IDS', '-'),
+        'admin_user_ids': os.environ.get('ADMIN_USER_IDS', '-').split(','),
         'allowed_user_ids': os.environ.get('ALLOWED_TELEGRAM_USER_IDS', '*'),
         'enable_quoting': os.environ.get('ENABLE_QUOTING', 'true').lower() == 'true',
         'enable_image_generation': os.environ.get('ENABLE_IMAGE_GENERATION', 'true').lower() == 'true',
@@ -106,12 +100,53 @@ def main():
         'plugins': os.environ.get('PLUGINS', '').split(',')
     }
 
-    # Setup and run ChatGPT and Telegram bot
+    # Список пользователей
+    users = defaultdict(dict)
+    pending_requests = set()  # Множество для заявок на вступление
+    blocked_users = set()  # Множество для заблокированных пользователей
+
+    # Функция для проверки прав администратора
+    def is_admin(user_id):
+        return str(user_id) in telegram_config['admin_user_ids']
+
+    # Функция для создания Inline клавиатуры
+    def admin_keyboard():
+        keyboard = [
+            [InlineKeyboardButton("Просмотр пользователей", callback_data='view_users')],
+            [InlineKeyboardButton("Просмотр заявок", callback_data='view_pending_requests')],
+            [InlineKeyboardButton("Блокировка пользователей", callback_data='block_user')],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    # Обработка нажатия кнопок
+    def handle_admin_command(update, context):
+        query = update.callback_query
+        user_id = update.effective_user.id
+
+        if is_admin(user_id):
+            if query.data == 'view_users':
+                query.answer(text=view_users())
+            elif query.data == 'view_pending_requests':
+                query.answer(text=view_pending_requests())
+            elif query.data == 'block_user':
+                query.answer(text="Введите ID пользователя для блокировки.")
+        else:
+            query.answer(text="У вас нет прав администратора.")
+
+    # Функции для администрирования
+    def view_users():
+        return "\n".join([f"User {user_id}" for user_id in users])
+
+    def view_pending_requests():
+        return "\n".join([f"Request from {user_id}" for user_id in pending_requests])
+
+    # Запуск и настройка плагинов
     plugin_manager = PluginManager(config=plugin_config)
     openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager)
-    telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
+    telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper, is_admin=is_admin, admin_keyboard=admin_keyboard, handle_admin_command=handle_admin_command)
+    
+    # Запуск бота
     telegram_bot.run()
-
 
 if __name__ == '__main__':
     main()
