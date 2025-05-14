@@ -9,7 +9,7 @@
 
 [Railway](https://railway.com) is being used for project deployment.
 
-A [Telegram bot](https://t.me/Language_assistant1_bot) that integrates with OpenAI's _official_ [ChatGPT](https://openai.com/blog/chatgpt/), [DALL·E](https://openai.com/product/dall-e-2) and [Whisper](https://openai.com/research/whisper) APIs to provide answers.
+A [Telegram bot](https://t.me/Language_assistant1_bot) that integrates with OpenAI's _official_ [ChatGPT](https://openai.com/blog/chatgpt/), [DALL·E](https://openai.com/product/dall-e-3) and [Whisper](https://openai.com/research/whisper) APIs to provide answers.
 
 ## Disclaimer
 This is a personal project and is not affiliated with OpenAI in any way.
