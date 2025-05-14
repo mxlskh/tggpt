@@ -85,11 +85,14 @@ class ChatGPTTelegramBot:
         
     async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.message.text.partition(' ')[2]
+        logging.info(f"🔍 Извлечён запрос: {query}")
         if not query:
             await update.message.reply_text(
                 "❗️Укажи, что искать: `/image_search кот в очках`",
                 parse_mode=constants.ParseMode.MARKDOWN
             )
+            logging.info("⚙️ Вызван image_search")
+            logging.info(f"📨 Сообщение: {update.message.text}")
             return
 
         result = await self.openai.plugin_manager.execute(
@@ -100,6 +103,7 @@ class ChatGPTTelegramBot:
             type="photo",
             region="wt-wt"
         )
+        logging.info(f"📸 Результат от плагина: {result}")
 
         if not result or 'direct_result' not in result or 'value' not in result['direct_result']:
             await update.message.reply_text("😔 Картинка не найдена.")
