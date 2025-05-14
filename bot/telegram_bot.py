@@ -29,6 +29,7 @@ from usage_tracker import UsageTracker
 class ChatGPTTelegramBot:
     """
     Class representing a ChatGPT Telegram Bot.
+    
     """
 
     def __init__(self, config: dict, openai: OpenAIHelper):
@@ -61,6 +62,33 @@ class ChatGPTTelegramBot:
         self.usage = {}
         self.last_message = {}
         self.inline_queries_cache = {}
+
+
+    async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.message.text.partition(' ')[2]
+        if not query:
+            await update.message.reply_text(
+                "❗️Укажи, что искать: `/image_search кот в очках`",
+                parse_mode=constants.ParseMode.MARKDOWN
+            )
+            return
+
+        result = await self.openai.plugin_manager.execute(
+            plugin_name="ddg_image_search",
+            function_name="search_images",
+            helper=self.openai,
+            query=query,
+            type="photo",
+            region="wt-wt"
+        )
+
+        if not result or 'direct_result' not in result or 'value' not in result['direct_result']:
+            await update.message.reply_text("😔 Картинка не найдена.")
+            return
+
+        image_url = result['direct_result']['value']
+        await update.message.reply_photo(photo=image_url)
+
 
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         """
@@ -1098,6 +1126,8 @@ class ChatGPTTelegramBot:
             .build()
 
         application.add_handler(CommandHandler('reset', self.reset))
+        application.add_handler(CommandHandler("image_search", self.image_search))
+        self.commands.append(BotCommand(command="image_search", description="Поиск изображения через DuckDuckGo"))
         application.add_handler(CommandHandler('help', self.help))
         application.add_handler(CommandHandler('image', self.image))
         application.add_handler(CommandHandler('tts', self.tts))
@@ -1123,29 +1153,3 @@ class ChatGPTTelegramBot:
         application.add_error_handler(error_handler)
 
         application.run_polling()
-
-
-
-    async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
-        """
-        Shows the help menu and a button to start dialog.
-        """
-        commands = self.group_commands if is_group_chat(update) else self.commands
-        bot_language = self.config['bot_language']
-        commands_description = [f'/{command.command} - {command.description}' for command in commands]
-        help_localized = localized_text('help_text', bot_language)
-
-        help_text = (
-            help_localized[0] +
-            '\n\n' +
-            '\n'.join(commands_description) +
-            '\n\n' +
-            help_localized[1] +
-            '\n\n' +
-            (help_localized[2] if len(help_localized) > 2 else '')
-        )
-
-        keyboard = [
-            [InlineKeyboardButton("Давай начнём", callback_data="start_dialog")]
-        ]
-        await update.message.reply_text(help_text, reply_markup=InlineKeyboardMarkup(keyboard))
