@@ -1124,8 +1124,8 @@ class ChatGPTTelegramBot:
             .build()
 
         application.add_handler(CommandHandler('reset', self.reset))
-        application.add_handler(CommandHandler("image_search", self.image_search))
-        self.commands.append(BotCommand(command="image_search", description="Поиск изображения через DuckDuckGo"))
+        application.add_handler(CommandHandler('image_search', self.image_search))
+        self.commands.append(BotCommand(command='image_search', description="Поиск изображения через DuckDuckGo"))
         application.add_handler(CommandHandler('help', self.help))
         application.add_handler(CommandHandler('image', self.image))
         application.add_handler(CommandHandler('tts', self.tts))
