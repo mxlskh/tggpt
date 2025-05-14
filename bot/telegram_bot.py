@@ -1149,32 +1149,3 @@ class ChatGPTTelegramBot:
             [InlineKeyboardButton("Давай начнём", callback_data="start_dialog")]
         ]
         await update.message.reply_text(help_text, reply_markup=InlineKeyboardMarkup(keyboard))
-        
-import requests
-
-async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.message.text.partition(' ')[2]
-    if not query:
-        await update.message.reply_text("❗️Укажи, что искать: `/image_search кот в очках`", parse_mode=constants.ParseMode.MARKDOWN)
-        return
-
-    bing_api_key = self.config.get('bing_api_key')
-    if not bing_api_key:
-        await update.message.reply_text("Bing API ключ не настроен.")
-        return
-
-    headers = {"Ocp-Apim-Subscription-Key": bing_api_key}
-    params = {"q": query, "count": 1}
-    response = requests.get("https://api.bing.microsoft.com/v7.0/images/search", headers=headers, params=params)
-    
-    if response.status_code != 200:
-        await update.message.reply_text(f"Ошибка Bing API: {response.status_code}")
-        return
-
-    data = response.json()
-    if not data.get("value"):
-        await update.message.reply_text("Картинки не найдены.")
-        return
-
-    image_url = data["value"][0]["contentUrl"]
-    await update.message.reply_photo(photo=image_url)
