@@ -84,13 +84,7 @@ class ChatGPTTelegramBot:
         await update.message.reply_text(help_text, disable_web_page_preview=True)
         
     async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-        logging.info("⚙️ Вызван image_search")
-        logging.info(f"📨 Сообщение: {update.message.text}")
-        
         query = update.message.text.partition(' ')[2]
-        
-        logging.info(f"🔍 Извлечён запрос: {query}")
         if not query:
             await update.message.reply_text(
                 "❗️Укажи, что искать: `/image_search кот в очках`",
@@ -105,7 +99,6 @@ class ChatGPTTelegramBot:
             query=query,
             type="photo",
             region="wt-wt"
-            logging.info(f"📸 Результат от плагина: {result}")
         )
 
         if not result or 'direct_result' not in result or 'value' not in result['direct_result']:
