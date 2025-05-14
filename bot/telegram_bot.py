@@ -82,6 +82,32 @@ class ChatGPTTelegramBot:
         (help_localized[2] if len(help_localized) > 2 else '')
     )
         await update.message.reply_text(help_text, disable_web_page_preview=True)
+        
+    async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.message.text.partition(' ')[2]
+        if not query:
+            await update.message.reply_text(
+                "❗️Укажи, что искать: `/image_search кот в очках`",
+                parse_mode=constants.ParseMode.MARKDOWN
+            )
+            return
+
+        result = await self.openai.plugin_manager.execute(
+            plugin_name="ddg_image_search",
+            function_name="search_images",
+            helper=self.openai,
+            query=query,
+            type="photo",
+            region="wt-wt"
+        )
+
+        if not result or 'direct_result' not in result or 'value' not in result['direct_result']:
+            await update.message.reply_text("😔 Картинка не найдена.")
+            return
+
+        image_url = result['direct_result']['value']
+        await update.message.reply_photo(photo=image_url)
+
 
     async def stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -1098,6 +1124,8 @@ class ChatGPTTelegramBot:
             .build()
 
         application.add_handler(CommandHandler('reset', self.reset))
+        application.add_handler(CommandHandler("image_search", self.image_search))
+        self.commands.append(BotCommand(command="image_search", description="Поиск изображения через DuckDuckGo"))
         application.add_handler(CommandHandler('help', self.help))
         application.add_handler(CommandHandler('image', self.image))
         application.add_handler(CommandHandler('tts', self.tts))
