@@ -84,30 +84,40 @@ class ChatGPTTelegramBot:
         await update.message.reply_text(help_text, disable_web_page_preview=True)
         
     async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        query = update.message.text.partition(' ')[2]
-        if not query:
-            await update.message.reply_text(
-                "❗️Укажи, что искать: `/image_search кот в очках`",
-                parse_mode=constants.ParseMode.MARKDOWN
-            )
-            return
 
-        result = await self.openai.plugin_manager.execute(
-            plugin_name="ddg_image_search",
-            function_name="search_images",
-            helper=self.openai,
-            query=query,
-            type="photo",
-            region="wt-wt"
+    logging.info("⚙️ Вызван image_search")
+    logging.info(f"📨 Сообщение: {update.message.text}")
+
+    query = update.message.text.partition(' ')[2]
+    logging.info(f"🔍 Извлечён запрос: {query}")
+    if not query:
+        await update.message.reply_text(
+            "❗️Укажи, что искать: `/image_search кот в очках`",
+            parse_mode=constants.ParseMode.MARKDOWN
         )
+        return
 
-        if not result or 'direct_result' not in result or 'value' not in result['direct_result']:
-            await update.message.reply_text("😔 Картинка не найдена.")
-            return
+    arguments = {
+        "query": query,
+        "type": "photo",
+        "region": "wt-wt"
+    }
 
+    result_raw = await self.openai.plugin_manager.call_function(
+        function_name="search_images",
+        helper=self.openai,
+        arguments=json.dumps(arguments)
+    )
+
+    logging.info(f"📸 Результат от плагина: {result_raw}")
+
+    try:
+        result = json.loads(result_raw)
         image_url = result['direct_result']['value']
         await update.message.reply_photo(photo=image_url)
-
+    except Exception as e:
+        logging.error(f"❌ Ошибка при отправке изображения: {e}")
+        await update.message.reply_text("😔 Не удалось найти или отправить изображение.")
 
     async def stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
