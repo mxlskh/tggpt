@@ -1175,34 +1175,36 @@ class ChatGPTTelegramBot:
             "region": "wt-wt"
         }
 
-        try:
-            result_raw = await self.openai.plugin_manager.call_function(
-                function_name="search_images",
-                helper=self.openai,
-                arguments=json.dumps(arguments)
-            )
+try:
+    result_raw = await self.openai.plugin_manager.call_function(
+        function_name="search_images",
+        helper=self.openai,
+        arguments=json.dumps(arguments)
+    )
 
-            logging.info(f"📸 Результат от плагина: {result_raw}")
-            result = json.loads(result_raw)
-            image_url = result['direct_result']['value']
+    logging.info(f"📸 Результат от плагина: {result_raw}")
+    result = json.loads(result_raw)
+    image_url = result['direct_result']['value']
 
-            # сначала отправим просто ссылку
-            await update.message.reply_text(f"🔗 Найдено изображение: {image_url}")
+    # сначала отправим ссылку
+    await update.message.reply_text(f"🔗 Найдено изображение: {image_url}")
 
-            # теперь скачаем файл и отправим его как фото
-            
-            headers = {
-                "User-Agent": "Mozilla/5.0"
-                }
-            response = requests.get(image_url, headers=headers)
-            logging.info(f"📥 Статус ответа: {response.status_code}, длина: {len(response.content)} байт")
-            # проверка размера файла (Telegram ограничивает ~20 МБ)
-            if len(response.content) > 20 * 1024 * 1024:
-                raise ValueError("❗️Файл слишком большой для отправки через Telegram")
-            response.raise_for_status()
-            image_data = BytesIO(response.content)
-            image_data.name = "result.jpg"
-            await update.message.reply_photo(photo=image_data)
-            except Exception as e:
-            logging.error(f"❌ Ошибка: {e}")
-            await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
+    # диагностика начала загрузки
+    logging.info("📡 Начинаем загрузку изображения")
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    response = requests.get(image_url, headers=headers)
+    logging.info(f"📥 Статус ответа: {response.status_code}, длина: {len(response.content)} байт")
+
+    if len(response.content) > 20 * 1024 * 1024:
+        logging.error("❗️Файл слишком большой")
+        await update.message.reply_text("❗️Файл слишком большой для отправки через Telegram.")
+        return
+
+    response.raise_for_status()
+
+    image_data = BytesIO(response.content)
+    image_data.name = "result.jpg"
+
+    logging.info("📤 Отправляем изображение в Telegram")
+    await update.message.reply_photo(photo=image_data)
