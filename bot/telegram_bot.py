@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import io
+import json
 
 from uuid import uuid4
 from telegram import BotCommandScopeAllGroupChats, Update, constants
