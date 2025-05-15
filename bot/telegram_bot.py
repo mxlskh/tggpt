@@ -1187,7 +1187,7 @@ class ChatGPTTelegramBot:
             await update.message.reply_text(f"🔗 Найдено изображение: {image_url}")
 
             # а потом попробуем отправить само фото
-            await update.message.reply_photo(photo=image_url)
+            await update.message.reply_document(document=image_url)
 
         except Exception as e:
             logging.error(f"❌ Ошибка: {e}")
