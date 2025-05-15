@@ -1190,16 +1190,19 @@ class ChatGPTTelegramBot:
             await update.message.reply_text(f"🔗 Найдено изображение: {image_url}")
 
             # теперь скачаем файл и отправим его как фото
-            import requests
-            response = requests.get(image_url)
-            response.raise_for_status()  # если 404 или ошибка — будет исключение
-
+            
+            headers = {
+                "User-Agent": "Mozilla/5.0"
+                }
+            response = requests.get(image_url, headers=headers)
+            logging.info(f"📥 Статус ответа: {response.status_code}, длина: {len(response.content)} байт")
+            # проверка размера файла (Telegram ограничивает ~20 МБ)
+            if len(response.content) > 20 * 1024 * 1024:
+                raise ValueError("❗️Файл слишком большой для отправки через Telegram")
+            response.raise_for_status()
             image_data = BytesIO(response.content)
             image_data.name = "result.jpg"
-
-            await update.message.reply_photo(photo=image_data)
-
+        await update.message.reply_photo(photo=image_data)
         except Exception as e:
-            logging.error(f"❌ Ошибка: {e}")
-            await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
-
+        logging.error(f"❌ Ошибка: {e}")
+        await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
