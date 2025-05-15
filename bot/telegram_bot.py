@@ -5,9 +5,13 @@ import asyncio
 import logging
 import os
 import io
-
+import json
+import logging
+import requests
 
 from uuid import uuid4
+from io import BytesIO
+from telegram import constants
 from telegram import BotCommandScopeAllGroupChats, Update, constants
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle
 from telegram import InputTextMessageContent, BotCommand
@@ -30,65 +34,59 @@ class ChatGPTTelegramBot:
     """
     Class representing a ChatGPT Telegram Bot.
     """
-import json
-import logging
-import requests
-from io import BytesIO
-from telegram import constants
+    async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        logging.info("⚙️ Вызван image_search")
+        logging.info(f"📨 Сообщение: {update.message.text}")
 
-async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logging.info("⚙️ Вызван image_search")
-    logging.info(f"📨 Сообщение: {update.message.text}")
+        query = update.message.text.partition(' ')[2]
+        logging.info(f"🔍 Извлечён запрос: {query}")
+        if not query:
+            await update.message.reply_text(
+                "❗️Укажи, что искать: `/image_search кот в очках`",
+                parse_mode=constants.ParseMode.MARKDOWN
+            )
+            return
 
-    query = update.message.text.partition(' ')[2]
-    logging.info(f"🔍 Извлечён запрос: {query}")
-    if not query:
-        await update.message.reply_text(
-            "❗️Укажи, что искать: `/image_search кот в очках`",
-            parse_mode=constants.ParseMode.MARKDOWN
-        )
-        return
-
-    arguments = {
-        "query": query,
-        "type": "photo",
-        "region": "wt-wt"
-    }
-
-    try:
-        result_raw = await self.openai.plugin_manager.call_function(
-            function_name="search_images",
-            helper=self.openai,
-            arguments=json.dumps(arguments)
-        )
-
-        logging.info(f"📸 Результат от плагина: {result_raw}")
-        result = json.loads(result_raw)
-        image_url = result['direct_result']['value']
-
-        await update.message.reply_text(f"🔗 Найдено изображение: {image_url}")
-
-        headers = {
-            "User-Agent": "Mozilla/5.0"
+        arguments = {
+            "query": query,
+            "type": "photo",
+            "region": "wt-wt"
         }
 
-        response = requests.get(image_url, headers=headers)
-        logging.info(f"📥 Статус ответа: {response.status_code}, длина: {len(response.content)} байт")
+        try:
+            result_raw = await self.openai.plugin_manager.call_function(
+                function_name="search_images",
+                helper=self.openai,
+                arguments=json.dumps(arguments)
+            )
 
-        if len(response.content) > 20 * 1024 * 1024:
-            raise ValueError("❗️Файл слишком большой для отправки через Telegram")
+            logging.info(f"📸 Результат от плагина: {result_raw}")
+            result = json.loads(result_raw)
+            image_url = result['direct_result']['value']
 
-        response.raise_for_status()
+            await update.message.reply_text(f"🔗 Найдено изображение: {image_url}")
 
-        image_data = BytesIO(response.content)
-        image_data.name = "result.jpg"
+            headers = {
+                "User-Agent": "Mozilla/5.0"
+            }
 
-        logging.info("📤 Отправляем изображение в Telegram")
-        await update.message.reply_photo(photo=image_data)
+            response = requests.get(image_url, headers=headers)
+            logging.info(f"📥 Статус ответа: {response.status_code}, длина: {len(response.content)} байт")
 
-    except Exception as e:
-        logging.error(f"❌ Ошибка: {e}")
-        await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
+            if len(response.content) > 20 * 1024 * 1024:
+                raise ValueError("❗️Файл слишком большой для отправки через Telegram")
+
+            response.raise_for_status()
+
+            image_data = BytesIO(response.content)
+            image_data.name = "result.jpg"
+
+            logging.info("📤 Отправляем изображение в Telegram")
+            await update.message.reply_photo(photo=image_data)
+
+        except Exception as e:
+            logging.error(f"❌ Ошибка: {e}")
+            await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
 
 
     def __init__(self, config: dict, openai: OpenAIHelper):
