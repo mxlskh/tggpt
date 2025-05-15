@@ -103,7 +103,7 @@ def main():
     }
 
     plugin_config = {
-        'plugins': os.environ.get('PLUGINS', '').split(',')
+        'plugins': os.environ.get('PLUGINS', 'ddg_image_search').split(',')
     }
 
     # Setup and run ChatGPT and Telegram bot
