@@ -1202,7 +1202,7 @@ class ChatGPTTelegramBot:
             response.raise_for_status()
             image_data = BytesIO(response.content)
             image_data.name = "result.jpg"
-        await update.message.reply_photo(photo=image_data)
-        except Exception as e:
-        logging.error(f"❌ Ошибка: {e}")
-        await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
+            await update.message.reply_photo(photo=image_data)
+            except Exception as e:
+            logging.error(f"❌ Ошибка: {e}")
+            await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
