@@ -64,7 +64,7 @@ class ChatGPTTelegramBot:
             result = json.loads(result_raw)
             image_url = result['direct_result']['value']
 
-            await update.message.reply_text(f"🔗 Найдено изображение: {image_url}")
+            #await update.message.reply_text(f"🔗 Найдено изображение: {image_url}")
 
             headers = {
                 "User-Agent": "Mozilla/5.0"
