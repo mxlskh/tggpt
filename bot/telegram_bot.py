@@ -1152,7 +1152,7 @@ class ChatGPTTelegramBot:
         ]
         await update.message.reply_text(help_text, reply_markup=InlineKeyboardMarkup(keyboard))
 
-        async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.info("⚙️ Вызван image_search")
         logging.info(f"📨 Сообщение: {update.message.text}")
 
