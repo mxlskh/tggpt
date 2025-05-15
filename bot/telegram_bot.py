@@ -1202,5 +1202,4 @@ class ChatGPTTelegramBot:
         except Exception as e:
             logging.error(f"❌ Ошибка: {e}")
             await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
-        await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
 
