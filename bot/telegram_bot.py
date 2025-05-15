@@ -1,12 +1,15 @@
 
 from __future__ import annotations
 from telegram import ReplyKeyboardMarkup
+from io import BytesIO
 
 import asyncio
 import logging
 import os
 import io
 import json
+import requests
+
 
 from uuid import uuid4
 from telegram import BotCommandScopeAllGroupChats, Update, constants
@@ -1152,7 +1155,7 @@ class ChatGPTTelegramBot:
             [InlineKeyboardButton("Давай начнём", callback_data="start_dialog")]
         ]
         await update.message.reply_text(help_text, reply_markup=InlineKeyboardMarkup(keyboard))
-
+        
     async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.info("⚙️ Вызван image_search")
         logging.info(f"📨 Сообщение: {update.message.text}")
@@ -1183,12 +1186,21 @@ class ChatGPTTelegramBot:
             result = json.loads(result_raw)
             image_url = result['direct_result']['value']
 
-            # сначала отправим просто ссылку, чтобы убедиться что работает
+            # сначала отправим просто ссылку
             await update.message.reply_text(f"🔗 Найдено изображение: {image_url}")
 
-            # а потом попробуем отправить само фото
-            await update.message.reply_document(document=image_url)
+            # теперь скачаем файл и отправим его как фото
+            import requests
+            response = requests.get(image_url)
+            response.raise_for_status()  # если 404 или ошибка — будет исключение
+
+            image_data = BytesIO(response.content)
+            image_data.name = "result.jpg"
+
+            await update.message.reply_photo(photo=image_data)
 
         except Exception as e:
             logging.error(f"❌ Ошибка: {e}")
-            await update.message.reply_text("😔 Произошла ошибка при поиске или отправке изображения.")
+            await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
+        await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
+
