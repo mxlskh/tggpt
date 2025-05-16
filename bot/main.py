@@ -42,7 +42,8 @@ def main():
     telegram_config = {
         'token': os.environ['TELEGRAM_BOT_TOKEN'],
         'bot_language': os.environ.get('BOT_LANGUAGE', 'ru'),
-        'allowed_user_ids': os.environ.get('ALLOWED_TELEGRAM_USER_IDS', '*')  # 🔥 добавлено!
+        'allowed_user_ids': os.environ.get('ALLOWED_TELEGRAM_USER_IDS', '*'),
+        'admin_user_ids': os.environ.get('ADMIN_USER_IDS', '-')  # ← добавлено!
     }
 
     plugin_config = {
