@@ -30,7 +30,6 @@ from telegram.ext import (
     Application,
     ContextTypes,
     CallbackContext,
-    Filters
 )
 
 from pydub import AudioSegment
