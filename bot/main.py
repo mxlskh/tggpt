@@ -35,6 +35,7 @@ def main():
         'stream': os.environ.get('STREAM', 'true').lower() == 'true',
         'enable_functions': os.environ.get('ENABLE_FUNCTIONS', str(functions_available)).lower() == 'true',
         'bot_language': os.environ.get('BOT_LANGUAGE', 'ru'),
+        'assistant_prompt': os.environ.get('ASSISTANT_PROMPT', 'You are a helpful assistant.'),
         # ... остальные параметры ...
     }
 
