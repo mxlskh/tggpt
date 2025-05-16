@@ -7,7 +7,7 @@ from plugin_manager import PluginManager
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
 from telegram_bot import ChatGPTTelegramBot
 
-from telegram.ext import Application
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
 
 def main():
