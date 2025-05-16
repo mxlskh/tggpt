@@ -75,8 +75,12 @@ def main():
     application.add_handler(CallbackQueryHandler(bot.handle_admin_buttons))
     application.add_handler(MessageHandler(filters.TEXT & filters.REPLY, bot.block_user_handler))
 
+    # ✅ Обработчик кнопки "Давай начнём" и всех шагов: преподаватель / ученик / язык
+    application.add_handler(CallbackQueryHandler(bot.handle_callback_inline_query))
+
     # Запуск
     application.run_polling()
+
 
 
 if __name__ == '__main__':
