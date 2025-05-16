@@ -43,7 +43,8 @@ def main():
         'token': os.environ['TELEGRAM_BOT_TOKEN'],
         'bot_language': os.environ.get('BOT_LANGUAGE', 'ru'),
         'allowed_user_ids': os.environ.get('ALLOWED_TELEGRAM_USER_IDS', '*'),
-        'admin_user_ids': os.environ.get('ADMIN_USER_IDS', '-')  # ← добавлено!
+        'admin_user_ids': os.environ.get('ADMIN_USER_IDS', '-'),
+        'user_budgets': os.environ.get('USER_BUDGETS', '*'),  # ← 🔥 ВАЖНО
     }
 
     plugin_config = {
