@@ -1,56 +1,40 @@
 from __future__ import annotations
+from telegram import ReplyKeyboardMarkup
+
 import asyncio
 import logging
 import os
 import io
 import json
+import logging
 import requests
+
 from uuid import uuid4
 from io import BytesIO
-
-from telegram import (
-    constants,
-    BotCommand,
-    BotCommandScopeAllGroupChats,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    InlineQueryResultArticle,
-    InputTextMessageContent,
-    ReplyKeyboardMarkup,
-    Update
-)
+from telegram import constants
+from telegram import BotCommandScopeAllGroupChats, Update, constants
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle
+from telegram import InputTextMessageContent, BotCommand
 from telegram.error import RetryAfter, TimedOut, BadRequest
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    filters,
-    InlineQueryHandler,
-    CallbackQueryHandler,
-    Application,
-    ContextTypes,
-    CallbackContext,
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, \
+    filters, InlineQueryHandler, CallbackQueryHandler, Application, ContextTypes, CallbackContext
 
 from pydub import AudioSegment
 from PIL import Image
 
-from utils import (
-    is_group_chat, get_thread_id, message_text, wrap_with_indicator, split_into_chunks,
-    edit_message_with_retry, get_stream_cutoff_values, is_allowed, get_remaining_budget,
-    is_admin, is_within_budget, get_reply_to_message_id, add_chat_request_to_usage_tracker,
-    error_handler, is_direct_result, handle_direct_result, cleanup_intermediate_files
-)
+from utils import is_group_chat, get_thread_id, message_text, wrap_with_indicator, split_into_chunks, \
+    edit_message_with_retry, get_stream_cutoff_values, is_allowed, get_remaining_budget, is_admin, is_within_budget, \
+    get_reply_to_message_id, add_chat_request_to_usage_tracker, error_handler, is_direct_result, handle_direct_result, \
+    cleanup_intermediate_files
 from openai_helper import OpenAIHelper, localized_text
 from usage_tracker import UsageTracker
-
 
 
 class ChatGPTTelegramBot:
     """
     Class representing a ChatGPT Telegram Bot.
     """
-    async def image_search(self, update: Update, context: CallbackContext):
+    async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.info("⚙️ Вызван image_search")
         logging.info(f"📨 Сообщение: {update.message.text}")
 
@@ -79,6 +63,8 @@ class ChatGPTTelegramBot:
             logging.info(f"📸 Результат от плагина: {result_raw}")
             result = json.loads(result_raw)
             image_url = result['direct_result']['value']
+
+            #await update.message.reply_text(f"🔗 Найдено изображение: {image_url}")
 
             headers = {
                 "User-Agent": "Mozilla/5.0"
@@ -118,6 +104,7 @@ class ChatGPTTelegramBot:
             BotCommand(command='stats', description=localized_text('stats_description', bot_language)),
             BotCommand(command='resend', description=localized_text('resend_description', bot_language))
         ]
+        # If imaging is enabled, add the "image" command to the list
         if self.config.get('enable_image_generation', False):
             self.commands.append(BotCommand(command='image', description=localized_text('image_description', bot_language)))
 
@@ -127,60 +114,11 @@ class ChatGPTTelegramBot:
         self.group_commands = [BotCommand(
             command='chat', description=localized_text('chat_description', bot_language)
         )] + self.commands
-
         self.disallowed_message = localized_text('disallowed', bot_language)
         self.budget_limit_message = localized_text('budget_limit', bot_language)
         self.usage = {}
         self.last_message = {}
         self.inline_queries_cache = {}
-
-        # Админские списки
-        self.ADMINS = [735059865]  # Замените на реальные Telegram user_id администраторов
-        self.pending_requests = []
-        self.blocked_users = set()
-
-    # --- Админ-функции ---
-
-    async def admin_panel(self, update: Update, context: CallbackContext):
-        user_id = update.effective_user.id
-        if user_id not in self.ADMINS:
-            return
-        keyboard = [
-            [InlineKeyboardButton("📋 Заявки на вступление", callback_data="admin_view_requests")],
-            [InlineKeyboardButton("🚫 Заблокировать пользователя", callback_data="admin_block_user")],
-            [InlineKeyboardButton("👥 Список участников", callback_data="admin_list_users")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        update.message.reply_text("Админ-панель:", reply_markup=reply_markup)
-
-    async def handle_admin_buttons(self, update: Update, context: CallbackContext):
-        query = update.callback_query
-        user_id = query.from_user.id
-        if user_id not in self.ADMINS:
-            query.answer("У вас нет прав администратора.")
-            return
-        await query.answer()
-        if query.data == "admin_view_requests":
-            if not self.pending_requests:
-                query.edit_message_text("Нет новых заявок.")
-            else:
-                text = "Заявки:\n" + "\n".join(str(uid) for uid in self.pending_requests)
-                query.edit_message_text(text)
-        elif query.data == "admin_list_users":
-            text = "Администраторы:\n" + "\n".join(str(uid) for uid in self.ADMINS)
-            query.edit_message_text(text)
-        elif query.data == "admin_block_user":
-            query.edit_message_text("Введите ID пользователя, которого нужно заблокировать:")
-
-    async def block_user_handler(self, update: Update, context: CallbackContext):
-        if not update.message.reply_to_message or update.message.reply_to_message.text != "Введите ID пользователя, которого нужно заблокировать:":
-            return
-        try:
-            user_id = int(update.message.text)
-            self.blocked_users.add(user_id)
-            update.message.reply_text(f"Пользователь {user_id} заблокирован.")
-        except ValueError:
-            update.message.reply_text("ID должен быть числом.")
 
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         """
@@ -1206,54 +1144,6 @@ class ChatGPTTelegramBot:
         await application.bot.set_my_commands(self.commands)
 
     def run(self):
-
-                        # ===== Административный функционал =====
-        self.ADMINS = [123456789]  # Замените на реальные Telegram user_id
-        self.pending_requests = []
-        self.blocked_users = set()
-
-        async def admin_panel(message: types.Message):
-            if message.from_user.id not in self.ADMINS:
-                return
-            markup = InlineKeyboardMarkup(row_width=1)
-            markup.add(
-                InlineKeyboardButton("📋 Заявки на вступление", callback_data="admin_view_requests"),
-                InlineKeyboardButton("🚫 Заблокировать пользователя", callback_data="admin_block_user"),
-                InlineKeyboardButton("👥 Список участников", callback_data="admin_list_users")
-            )
-            await message.answer("Админ-панель:", reply_markup=markup)
-
-        async def view_requests(callback_query: types.CallbackQuery):
-            if not self.pending_requests:
-                await callback_query.message.answer("Нет новых заявок.")
-                return
-            text = "Заявки:\n" + "\n".join([str(uid) for uid in self.pending_requests])
-            await callback_query.message.answer(text)
-
-        async def list_users(callback_query: types.CallbackQuery):
-            text = "Участники:\n" + "\n".join([str(uid) for uid in self.ADMINS])
-            await callback_query.message.answer(text)
-
-        async def ask_block_user(callback_query: types.CallbackQuery):
-            await callback_query.message.answer("Введите ID пользователя, которого нужно заблокировать:")
-
-        async def block_user_message(message: types.Message):
-            try:
-                user_id = int(message.text)
-                self.blocked_users.add(user_id)
-                await message.reply(f"Пользователь {user_id} заблокирован.")
-            except ValueError:
-                await message.reply("ID должен быть числом.")
-
-        self.dp.register_message_handler(admin_panel, commands=["admin"])
-        self.dp.register_callback_query_handler(view_requests, Text(equals="admin_view_requests"))
-        self.dp.register_callback_query_handler(list_users, Text(equals="admin_list_users"))
-        self.dp.register_callback_query_handler(ask_block_user, Text(equals="admin_block_user"))
-        self.dp.register_message_handler(
-            block_user_message,
-            lambda message: message.reply_to_message and message.reply_to_message.text == "Введите ID пользователя, которого нужно заблокировать:"
-        )
-
         """
         Runs the bot indefinitely until the user presses Ctrl+C
         """
@@ -1274,9 +1164,6 @@ class ChatGPTTelegramBot:
         application.add_handler(CommandHandler('start', self.help))
         application.add_handler(CommandHandler('stats', self.stats))
         application.add_handler(CommandHandler('resend', self.resend))
-        application.add_handler(CommandHandler('admin', self.admin_panel))
-        application.add_handler(CallbackQueryHandler(self.handle_admin_buttons))
-        application.add_handler(MessageHandler(filters.TEXT & filters.REPLY, self.block_user_handler))
         application.add_handler(CommandHandler(
             'chat', self.prompt, filters=filters.ChatType.GROUP | filters.ChatType.SUPERGROUP)
         )
