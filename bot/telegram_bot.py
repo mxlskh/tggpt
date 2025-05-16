@@ -103,7 +103,7 @@ class ChatGPTTelegramBot:
             await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
 
 
-    def __init__(self, config: dict, openai: OpenAIHelper):
+    async def __init__(self, config: dict, openai: OpenAIHelper):
         """
         Initializes the bot with the given configuration and GPT bot object.
         :param config: A dictionary containing the bot configuration
@@ -141,7 +141,7 @@ class ChatGPTTelegramBot:
 
     # --- Админ-функции ---
 
-    def admin_panel(self, update: Update, context: CallbackContext):
+    async def admin_panel(self, update: Update, context: CallbackContext):
         user_id = update.effective_user.id
         if user_id not in self.ADMINS:
             return
@@ -153,7 +153,7 @@ class ChatGPTTelegramBot:
         reply_markup = InlineKeyboardMarkup(keyboard)
         update.message.reply_text("Админ-панель:", reply_markup=reply_markup)
 
-    def handle_admin_buttons(self, update: Update, context: CallbackContext):
+    async def handle_admin_buttons(self, update: Update, context: CallbackContext):
         query = update.callback_query
         user_id = query.from_user.id
         if user_id not in self.ADMINS:
@@ -172,7 +172,7 @@ class ChatGPTTelegramBot:
         elif query.data == "admin_block_user":
             query.edit_message_text("Введите ID пользователя, которого нужно заблокировать:")
 
-    def block_user_handler(self, update: Update, context: CallbackContext):
+    async def block_user_handler(self, update: Update, context: CallbackContext):
         if not update.message.reply_to_message or update.message.reply_to_message.text != "Введите ID пользователя, которого нужно заблокировать:":
             return
         try:
