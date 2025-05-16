@@ -120,6 +120,15 @@ class ChatGPTTelegramBot:
         self.last_message = {}
         self.inline_queries_cache = {}
 
+    from aiogram import Bot, Dispatcher
+    from aiogram.contrib.fsm_storage.memory import MemoryStorage
+
+    self.bot = Bot(token=self.config['token'])
+    self.storage = MemoryStorage()
+    self.dp = Dispatcher(self.bot, storage=self.storage)
+
+        
+
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         """
         Shows the help menu.
