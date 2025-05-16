@@ -1144,6 +1144,54 @@ class ChatGPTTelegramBot:
         await application.bot.set_my_commands(self.commands)
 
     def run(self):
+
+                        # ===== Административный функционал =====
+        self.ADMINS = [123456789]  # Замените на реальные Telegram user_id
+        self.pending_requests = []
+        self.blocked_users = set()
+
+        async def admin_panel(message: types.Message):
+            if message.from_user.id not in self.ADMINS:
+                return
+            markup = InlineKeyboardMarkup(row_width=1)
+            markup.add(
+                InlineKeyboardButton("📋 Заявки на вступление", callback_data="admin_view_requests"),
+                InlineKeyboardButton("🚫 Заблокировать пользователя", callback_data="admin_block_user"),
+                InlineKeyboardButton("👥 Список участников", callback_data="admin_list_users")
+            )
+            await message.answer("Админ-панель:", reply_markup=markup)
+
+        async def view_requests(callback_query: types.CallbackQuery):
+            if not self.pending_requests:
+                await callback_query.message.answer("Нет новых заявок.")
+                return
+            text = "Заявки:\n" + "\n".join([str(uid) for uid in self.pending_requests])
+            await callback_query.message.answer(text)
+
+        async def list_users(callback_query: types.CallbackQuery):
+            text = "Участники:\n" + "\n".join([str(uid) for uid in self.ADMINS])
+            await callback_query.message.answer(text)
+
+        async def ask_block_user(callback_query: types.CallbackQuery):
+            await callback_query.message.answer("Введите ID пользователя, которого нужно заблокировать:")
+
+        async def block_user_message(message: types.Message):
+            try:
+                user_id = int(message.text)
+                self.blocked_users.add(user_id)
+                await message.reply(f"Пользователь {user_id} заблокирован.")
+            except ValueError:
+                await message.reply("ID должен быть числом.")
+
+        self.dp.register_message_handler(admin_panel, commands=["admin"])
+        self.dp.register_callback_query_handler(view_requests, Text(equals="admin_view_requests"))
+        self.dp.register_callback_query_handler(list_users, Text(equals="admin_list_users"))
+        self.dp.register_callback_query_handler(ask_block_user, Text(equals="admin_block_user"))
+        self.dp.register_message_handler(
+            block_user_message,
+            lambda message: message.reply_to_message and message.reply_to_message.text == "Введите ID пользователя, которого нужно заблокировать:"
+        )
+
         """
         Runs the bot indefinitely until the user presses Ctrl+C
         """
@@ -1209,49 +1257,3 @@ class ChatGPTTelegramBot:
             [InlineKeyboardButton("Давай начнём", callback_data="start_dialog")]
         ]
         await update.message.reply_text(help_text, reply_markup=InlineKeyboardMarkup(keyboard))
-
-# ===== Административный функционал =====
-
-ADMINS = [123456789]  # Замените на реальные Telegram user_id администраторов
-JOIN_REQUESTS = []
-BLOCKED_USERS = set()
-
-@dp.message_handler(commands=['admin'])
-async def admin_panel(message: types.Message):
-    if message.from_user.id not in ADMINS:
-        return
-
-    markup = InlineKeyboardMarkup(row_width=1)
-    markup.add(
-        InlineKeyboardButton("📋 Заявки на вступление", callback_data="admin_view_requests"),
-        InlineKeyboardButton("🚫 Заблокировать пользователя", callback_data="admin_block_user"),
-        InlineKeyboardButton("👥 Список участников", callback_data="admin_list_users")
-    )
-    await message.answer("Админ-панель:", reply_markup=markup)
-
-@dp.callback_query_handler(Text(equals="admin_view_requests"))
-async def view_requests(callback_query: types.CallbackQuery):
-    if not JOIN_REQUESTS:
-        await callback_query.message.answer("Нет новых заявок.")
-        return
-
-    text = "Заявки:\n" + "\n".join([str(user_id) for user_id in JOIN_REQUESTS])
-    await callback_query.message.answer(text)
-
-@dp.callback_query_handler(Text(equals="admin_list_users"))
-async def list_users(callback_query: types.CallbackQuery):
-    text = "Участники:\n" + "\n".join([str(user_id) for user_id in ADMINS])
-    await callback_query.message.answer(text)
-
-@dp.callback_query_handler(Text(equals="admin_block_user"))
-async def ask_block_user(callback_query: types.CallbackQuery):
-    await callback_query.message.answer("Введите ID пользователя, которого нужно заблокировать:")
-
-@dp.message_handler(lambda message: message.reply_to_message and message.reply_to_message.text == "Введите ID пользователя, которого нужно заблокировать:")
-async def block_user(message: types.Message):
-    try:
-        user_id = int(message.text)
-        BLOCKED_USERS.add(user_id)
-        await message.reply(f"Пользователь {user_id} заблокирован.")
-    except ValueError:
-        await message.reply("ID должен быть числом.")
