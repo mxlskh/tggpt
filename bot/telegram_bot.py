@@ -103,7 +103,7 @@ class ChatGPTTelegramBot:
             await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
 
 
-    async def __init__(self, config: dict, openai: OpenAIHelper):
+    def __init__(self, config: dict, openai: OpenAIHelper):
         """
         Initializes the bot with the given configuration and GPT bot object.
         :param config: A dictionary containing the bot configuration
