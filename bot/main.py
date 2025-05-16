@@ -45,6 +45,7 @@ def main():
         'allowed_user_ids': os.environ.get('ALLOWED_TELEGRAM_USER_IDS', '*'),
         'admin_user_ids': os.environ.get('ADMIN_USER_IDS', '-'),
         'user_budgets': os.environ.get('USER_BUDGETS', '*'),  # ← 🔥 ВАЖНО
+        'budget_period': os.environ.get('BUDGET_PERIOD', 'monthly')
     }
 
     plugin_config = {

@@ -159,7 +159,7 @@ class ChatGPTTelegramBot:
         if user_id not in self.ADMINS:
             query.answer("У вас нет прав администратора.")
             return
-        query.answer()
+        await query.answer()
         if query.data == "admin_view_requests":
             if not self.pending_requests:
                 query.edit_message_text("Нет новых заявок.")
