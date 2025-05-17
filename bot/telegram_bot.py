@@ -1265,7 +1265,7 @@ class ChatGPTTelegramBot:
             .build()
 
         application.add_handler(CommandHandler('admin', self.admin_panel))
-        application.add_handler(CallbackQueryHandler(self.handle_admin_buttons, pattern="^admin_|^approve_request_|^reject_request_|^block_user_|^unblock_user_"))
+        application.add_handler(CallbackQueryHandler(self.handle_admin_buttons, pattern="^admin_"))
         application.add_handler(CommandHandler('reset', self.reset))
         application.add_handler(CommandHandler("image_search", self.image_search))
         self.commands.append(BotCommand(command="image_search", description="Поиск изображения через DuckDuckGo"))
@@ -1289,7 +1289,7 @@ class ChatGPTTelegramBot:
         application.add_handler(InlineQueryHandler(self.inline_query, chat_types=[
             constants.ChatType.GROUP, constants.ChatType.SUPERGROUP, constants.ChatType.PRIVATE
         ]))
-        application.add_handler(CallbackQueryHandler(self.handle_admin_buttons, pattern="^(admin_|approve_request_|reject_request_|block_user_|unblock_user_)"))
+        application.add_handler(CallbackQueryHandler(self.handle_admin_buttons, pattern="^(approve_request_|reject_request_|block_user_|unblock_user_)"))
 
         application.add_error_handler(error_handler)
 
