@@ -111,3 +111,8 @@ class Database:
 
     def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_user_ids
+    
+    def is_approved(self, user_id: int) -> bool:
+        users = self.get_users()
+        user = users.get(str(user_id))
+        return user is not None and user.get("status") != "pending"

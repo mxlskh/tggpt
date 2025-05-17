@@ -164,7 +164,8 @@ class ChatGPTTelegramBot:
 
         if user_id in requests:
             users[user_id] = {
-                "name": requests[user_id]["name"],
+                "username": requests[user_id].get("username") or requests[user_id].get("name"),
+                "status": "approved",
                 "joined": str(datetime.now().date())
             }
             del requests[user_id]
@@ -1305,7 +1306,12 @@ class ChatGPTTelegramBot:
         Shows the help menu and a button to start dialog.
         """
         user = update.effective_user
-        self.add_join_request(user.id, user.username)  # 🔥 Регистрация заявки
+        user_id = user.id
+
+        if not self.db.is_approved(user_id):
+            self.db.add_join_request(user_id, user.username)  # 🔥 Регистрация заявки
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка отправлена, дождитесь одобрения администратора.")
+            return
 
         commands = self.group_commands if is_group_chat(update) else self.commands
         bot_language = self.config['bot_language']
