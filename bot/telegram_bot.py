@@ -1232,7 +1232,7 @@ class ChatGPTTelegramBot:
             .concurrent_updates(True) \
             .build()
 
-        application.add_handler(CommandHandler('admin', self.admin))
+        application.add_handler(CommandHandler('admin', self.admin_panel))
         application.add_handler(CommandHandler('reset', self.reset))
         application.add_handler(CommandHandler("image_search", self.image_search))
         self.commands.append(BotCommand(command="image_search", description="Поиск изображения через DuckDuckGo"))
@@ -1343,7 +1343,7 @@ class ChatGPTTelegramBot:
             await query.edit_message_text("❌ Заявка отклонена.")
         else:
             await query.edit_message_text(f"Неизвестное действие: {data}")         
-    async def admin_pannel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def admin_panel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         if not is_admin(self.config, user_id):
             await update.message.reply_text("❌ У вас нет доступа к этой команде.")
