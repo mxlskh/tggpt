@@ -135,6 +135,7 @@ class ChatGPTTelegramBot:
         self.last_message = {}
         self.inline_queries_cache = {}
         admin_ids_str = os.getenv("ADMIN_USER_IDS", "")
+        self.admin_user_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip().isdigit()]
         allowed_user_ids_str = os.getenv("allowed_user_ids", "") 
         allowed_user_ids = [x.strip() for x in allowed_user_ids_str.split(",") if x.strip()]
         self.DATA_DIR = "data"
