@@ -1428,6 +1428,7 @@ class ChatGPTTelegramBot:
         await update.message.reply_text(help_text, reply_markup=InlineKeyboardMarkup(keyboard))
          
     async def handle_admin_buttons(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        print(f"[DEBUG] Callback data type: {type(query.data)}, value: {query.data}")
         print("===> handle_admin_buttons called")
         query = update.callback_query
         await query.answer()  # обязательно отвечаем на callback_query, чтобы убрать "часики" в UI
