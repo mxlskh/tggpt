@@ -167,7 +167,7 @@ class ChatGPTTelegramBot:
             }
             self.save_json("users.json", users)
 
-    def approve_request(self, user_id):
+    async def approve_request(self, user_id, bot):
         requests = self.get_requests()
         users = self.get_users()
         user_id = str(user_id)
@@ -181,6 +181,15 @@ class ChatGPTTelegramBot:
             del requests[user_id]
             self.save_json("users.json", users)
             self.save_json("join_requests.json", requests)
+
+            # Уведомление пользователя
+            try:
+                await bot.send_message(
+                    chat_id=int(user_id),
+                    text="✅ Ваша заявка одобрена! Теперь вы можете использовать функционал бота."
+                )
+            except Exception as e:
+                print(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
 
     def reject_request(self, user_id):
         requests = self.get_requests()
@@ -1434,9 +1443,14 @@ class ChatGPTTelegramBot:
 
         elif data.startswith("approve_request_"):
             user_id = data.split("_")[-1]
-            self.db.approve_request(user_id)
-            await query.answer("Заявка одобрена")
-            await query.edit_message_text("Заявка одобрена.")
+
+            try:
+                await self.db.approve_request(user_id, context.bot)  # добавили отправку уведомления
+                await query.answer("Заявка одобрена")
+                await query.edit_message_text("✅ Заявка одобрена. Пользователь уведомлён.")
+            except Exception as e:
+                logging.error(f"Ошибка при одобрении заявки: {e}")
+                await query.answer("Ошибка при одобрении заявки", show_alert=True)
             return
 
         elif data.startswith("reject_request_"):

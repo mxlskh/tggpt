@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from datetime import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -38,19 +39,29 @@ class Database:
             }
             self.save_json("users.json", users)
 
-    def approve_request(self, user_id):
+    async def approve_request(self, user_id, bot):
         requests = self.get_requests()
         users = self.get_users()
         user_id = str(user_id)
 
         if user_id in requests:
             users[user_id] = {
-                "name": requests[user_id]["name"],
+                "username": requests[user_id].get("username") or requests[user_id].get("name"),
+                "status": "approved",
                 "joined": str(datetime.now().date())
             }
             del requests[user_id]
             self.save_json("users.json", users)
             self.save_json("join_requests.json", requests)
+
+        # Уведомляем пользователя
+        try:
+            await bot.send_message(
+                chat_id=int(user_id),
+                text="✅ Ваша заявка одобрена! Теперь вы можете пользоваться ботом."
+            )
+        except Exception as e:
+            logging.warning(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
 
     def reject_request(self, user_id):
         requests = self.get_requests()
