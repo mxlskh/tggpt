@@ -38,6 +38,9 @@ class ChatGPTTelegramBot:
     Class representing a ChatGPT Telegram Bot.
     """
     async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
         logging.info("⚙️ Вызван image_search")
         logging.info(f"📨 Сообщение: {update.message.text}")
 
@@ -236,6 +239,9 @@ class ChatGPTTelegramBot:
         """
         Shows the help menu.
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
         commands = self.group_commands if is_group_chat(update) else self.commands
         commands_description = [f'/{command.command} - {command.description}' for command in commands]
         bot_language = self.config['bot_language']
@@ -257,6 +263,9 @@ class ChatGPTTelegramBot:
         """
         Returns token usage statistics for current day and month.
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
         if not await is_allowed(self.config, update, context):
             logging.warning(f'User {update.message.from_user.name} (id: {update.message.from_user.id}) '
                             'is not allowed to request their usage statistics')
@@ -363,6 +372,9 @@ class ChatGPTTelegramBot:
         """
         Resend the last request
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
         if not await is_allowed(self.config, update, context):
             logging.warning(f'User {update.message.from_user.name}  (id: {update.message.from_user.id})'
                             ' is not allowed to resend the message')
@@ -391,6 +403,10 @@ class ChatGPTTelegramBot:
         """
         Resets the conversation.
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
+        
         if not await is_allowed(self.config, update, context):
             logging.warning(f'User {update.message.from_user.name} (id: {update.message.from_user.id}) '
                             'is not allowed to reset the conversation')
@@ -412,6 +428,9 @@ class ChatGPTTelegramBot:
         """
         Generates an image for the given prompt using DALL·E APIs
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
         if not self.config['enable_image_generation'] \
                 or not await self.check_allowed_and_within_budget(update, context):
             return
@@ -428,6 +447,10 @@ class ChatGPTTelegramBot:
                      f'(id: {update.message.from_user.id})')
 
         async def _generate():
+            if not self.db.is_approved(user.id):
+                await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+                return
+        
             try:
                 image_url, image_size = await self.openai.generate_image(prompt=image_query)
                 if self.config['image_receive_mode'] == 'photo':
@@ -464,6 +487,9 @@ class ChatGPTTelegramBot:
         """
         Generates an speech for the given input using TTS APIs
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
         if not self.config['enable_tts_generation'] \
                 or not await self.check_allowed_and_within_budget(update, context):
             return
@@ -480,6 +506,9 @@ class ChatGPTTelegramBot:
                      f'(id: {update.message.from_user.id})')
 
         async def _generate():
+            if not self.db.is_approved(user.id):
+                await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+                return
             try:
                 speech_file, text_length = await self.openai.generate_speech(text=tts_query)
 
@@ -510,6 +539,9 @@ class ChatGPTTelegramBot:
         """
         Transcribe audio messages.
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
         if not self.config['enable_transcription'] or not await self.check_allowed_and_within_budget(update, context):
             return
 
@@ -521,6 +553,9 @@ class ChatGPTTelegramBot:
         filename = update.message.effective_attachment.file_unique_id
 
         async def _execute():
+            if not self.db.is_approved(user.id):
+                await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+                return
             filename_mp3 = f'{filename}.mp3'
             bot_language = self.config['bot_language']
             try:
@@ -630,6 +665,9 @@ class ChatGPTTelegramBot:
         """
         Interpret image using vision model.
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
         if not self.config['enable_vision'] or not await self.check_allowed_and_within_budget(update, context):
             return
 
@@ -651,6 +689,9 @@ class ChatGPTTelegramBot:
         
 
         async def _execute():
+            if not self.db.is_approved(user.id):
+                await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+                return
             bot_language = self.config['bot_language']
             try:
                 media_file = await context.bot.get_file(image.file_id)
@@ -822,6 +863,9 @@ class ChatGPTTelegramBot:
         """
         React to incoming messages and respond accordingly.
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
         if update.edited_message or not update.message or update.message.via_bot:
             return
 
@@ -941,6 +985,9 @@ class ChatGPTTelegramBot:
 
             else:
                 async def _reply():
+                    if not self.db.is_approved(user.id):
+                        await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+                        return
                     nonlocal total_tokens
                     response, total_tokens = await self.openai.get_chat_response(chat_id=chat_id, query=prompt)
 
@@ -987,6 +1034,9 @@ class ChatGPTTelegramBot:
         """
         Handle the inline query. This is run when you type: @botusername <query>
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
         query = update.inline_query.query
         if len(query) < 3:
             return
@@ -1004,6 +1054,9 @@ class ChatGPTTelegramBot:
         """
         Send inline query result
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
         try:
             reply_markup = None
             bot_language = self.config['bot_language']
@@ -1030,6 +1083,9 @@ class ChatGPTTelegramBot:
         """
         Handle the callback query from the inline query result
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
         callback_data = update.callback_query.data
         # Custom role/language selection
         if callback_data == "start_dialog":
@@ -1159,6 +1215,9 @@ class ChatGPTTelegramBot:
 
                 else:
                     async def _send_inline_query_response():
+                        if not self.db.is_approved(user.id):
+                            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+                            return
                         nonlocal total_tokens
                         # Edit the current message to indicate that the answer is being processed
                         await context.bot.edit_message_text(inline_message_id=inline_message_id,
@@ -1207,6 +1266,9 @@ class ChatGPTTelegramBot:
         :param is_inline: Boolean flag for inline queries
         :return: Boolean indicating if the user is allowed to use the bot
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
         name = update.inline_query.from_user.name if is_inline else update.message.from_user.name
         user_id = update.inline_query.from_user.id if is_inline else update.message.from_user.id
 
@@ -1225,6 +1287,9 @@ class ChatGPTTelegramBot:
         """
         Sends the disallowed message to the user.
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
         if not is_inline:
             await update.effective_message.reply_text(
                 message_thread_id=get_thread_id(update),
@@ -1239,6 +1304,10 @@ class ChatGPTTelegramBot:
         """
         Sends the budget reached message to the user.
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
+        
         if not is_inline:
             await update.effective_message.reply_text(
                 message_thread_id=get_thread_id(update),
@@ -1252,6 +1321,10 @@ class ChatGPTTelegramBot:
         """
         Post initialization hook for the bot.
         """
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка ещё не одобрена администратором."            )
+            return
+        
         await application.bot.set_my_commands(self.group_commands, scope=BotCommandScopeAllGroupChats())
         await application.bot.set_my_commands(self.commands)
 
