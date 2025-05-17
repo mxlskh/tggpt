@@ -134,7 +134,7 @@ class ChatGPTTelegramBot:
         self.usage = {}
         self.last_message = {}
         self.inline_queries_cache = {}
-        admin_ids_str = os.getenv("ADMIN_USER_IDS", "")
+        admin_ids_str = os.getenv("admin_user_ids", "")
         self.admin_user_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip().isdigit()]
         self.DATA_DIR = "data"
         os.makedirs(self.DATA_DIR, exist_ok=True)\
@@ -1089,7 +1089,7 @@ class ChatGPTTelegramBot:
             await update.callback_query.answer(
                 "Заявка отправлена. Ожидайте одобрения администратора.", show_alert=True
             )
-            for admin_id in self.config["ADMIN_USER_IDS"]:
+            for admin_id in self.config["admin_user_ids"]:
                 try:
                     await context.bot.send_message(
                         chat_id=admin_id,
