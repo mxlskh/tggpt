@@ -1342,6 +1342,7 @@ class ChatGPTTelegramBot:
                  text = "Пользователей нет."
             await query.answer()
             await query.edit_message_text(text)
+            return
 
         elif data == "admin_view_requests":
             requests = self.db.get_requests()
@@ -1361,36 +1362,42 @@ class ChatGPTTelegramBot:
             text = "\n".join(text_lines)
             await query.answer()
             await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+            return
 
         elif data.startswith("approve_request_"):
             user_id = data.split("_")[-1]
             self.db.approve_request(user_id)
             await query.answer("Заявка одобрена")
             await query.edit_message_text("Заявка одобрена.")
+            return
 
         elif data.startswith("reject_request_"):
             user_id = data.split("_")[-1]
             self.db.reject_request(user_id)
             await query.answer("Заявка отклонена")
             await query.edit_message_text("Заявка отклонена.")
+            return
 
         elif data == "admin_blocked_users":
             blocked = self.db.get_blocked_users()
             text = "\n".join(map(str, blocked)) if blocked else "Заблокированных пользователей нет."
             await query.answer()
             await query.edit_message_text(text)
+            return
 
         elif data.startswith("unblock_user_"):
             user_id = data.split("_")[-1]
             self.db.unblock_user(user_id)
             await query.answer("Пользователь разблокирован")
             await query.edit_message_text("Пользователь разблокирован.")
+            return
     
         elif data.startswith("block_user_"):
             user_id = data.split("_")[-1]
             self.db.block_user(user_id)
             await query.answer("Пользователь заблокирован")
             await query.edit_message_text("Пользователь заблокирован.")
+            return
 
         if data == 'admin_approve':
             await query.edit_message_text("✅ Заявка одобрена.")
