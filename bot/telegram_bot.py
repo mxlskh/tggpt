@@ -1088,13 +1088,6 @@ class ChatGPTTelegramBot:
             await update.callback_query.answer(
                 "Заявка отправлена. Ожидайте одобрения администратора.", show_alert=True
             )
-            return
-        if not await self.check_access(update):
-            await update.callback_query.answer(
-            "⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.",
-            show_alert=True
-            )
-
             for admin_id in self.config.ADMIN_USER_IDS:
                 try:
                     await context.bot.send_message(
@@ -1104,6 +1097,11 @@ class ChatGPTTelegramBot:
                 except Exception as e:
                     print(f"❗ Ошибка при уведомлении админа {admin_id}: {e}")
             return
+        if not await self.check_access(update):
+            await update.callback_query.answer(
+            "⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.",
+            show_alert=True
+            )
 
         elif callback_data == "role_teacher":
             keyboard = [
