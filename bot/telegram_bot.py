@@ -537,18 +537,6 @@ class ChatGPTTelegramBot:
         
         image = update.message.effective_attachment[-1]
         
-        async def handle_admin_buttons(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-            query = update.callback_query
-            await query.answer()  # обязательно отвечаем на callback_query, чтобы убрать "часики" в UI
-
-            data = query.data
-            # Здесь можете обработать разные действия в зависимости от data
-            if data == 'admin_approve':
-                await query.edit_message_text("✅ Заявка одобрена.")
-            elif data == 'admin_reject':
-                await query.edit_message_text("❌ Заявка отклонена.")
-            else:
-                await query.edit_message_text(f"Неизвестное действие: {data}")
 
         async def _execute():
             bot_language = self.config['bot_language']
@@ -1222,3 +1210,16 @@ class ChatGPTTelegramBot:
             [InlineKeyboardButton("Давай начнём", callback_data="start_dialog")]
         ]
         await update.message.reply_text(help_text, reply_markup=InlineKeyboardMarkup(keyboard))
+         
+    async def handle_admin_buttons(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()  # обязательно отвечаем на callback_query, чтобы убрать "часики" в UI
+
+        data = query.data
+            # Здесь можете обработать разные действия в зависимости от data
+        if data == 'admin_approve':
+            await query.edit_message_text("✅ Заявка одобрена.")
+        elif data == 'admin_reject':
+            await query.edit_message_text("❌ Заявка отклонена.")
+        else:
+            await query.edit_message_text(f"Неизвестное действие: {data}")         
