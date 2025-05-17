@@ -1334,38 +1334,61 @@ class ChatGPTTelegramBot:
         logging.info(f"Admin button pressed: {data}")
             # Здесь можете обработать разные действия в зависимости от data
         if data == "admin_list_users":
-            # Получить список пользователей и показать
-            users_list = self.get_users_list_text()
-            await query.edit_message_text(f"Пользователи:\n{users_list}")
+            users = self.db.get_users()
+            text = "\n".join([f"{uid} — {info.get('username', 'Без имени')}" for uid, info in users.items()])
+            if not text:
+                 text = "Пользователей нет."
+            await query.answer()
+            await query.edit_message_text(text)
 
         elif data == "admin_view_requests":
-            # Показать заявки с кнопками "Одобрить" / "Отклонить" для каждой заявки
-            requests_text, keyboard = self.get_requests_keyboard()
-            await query.edit_message_text(requests_text, reply_markup=keyboard)
+            requests = self.db.get_requests()
+            if not requests:
+                await query.answer()
+                await query.edit_message_text("Заявок нет.")
+                return
+            text_lines = []
+            keyboard = []
+            for uid, info in requests.items():
+                name = info.get("name", "Без имени")
+                text_lines.append(f"{uid} — {name}")
+                keyboard.append([
+                    InlineKeyboardButton("✅ Одобрить", callback_data=f"approve_request_{uid}"),
+                    InlineKeyboardButton("❌ Отклонить", callback_data=f"reject_request_{uid}")
+                ])
+            text = "\n".join(text_lines)
+            await query.answer()
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
         elif data.startswith("approve_request_"):
-            user_id_to_approve = int(data.split("_")[-1])
-            self.approve_request(user_id_to_approve)
-            await query.edit_message_text(f"✅ Заявка пользователя {user_id_to_approve} одобрена.")
-    
+            user_id = data.split("_")[-1]
+            self.db.approve_request(user_id)
+            await query.answer("Заявка одобрена")
+            await query.edit_message_text("Заявка одобрена.")
+
         elif data.startswith("reject_request_"):
-            user_id_to_reject = int(data.split("_")[-1])
-            self.reject_request(user_id_to_reject)
-            await query.edit_message_text(f"❌ Заявка пользователя {user_id_to_reject} отклонена.")
+            user_id = data.split("_")[-1]
+            self.db.reject_request(user_id)
+            await query.answer("Заявка отклонена")
+            await query.edit_message_text("Заявка отклонена.")
 
         elif data == "admin_blocked_users":
-            blocked_users_text = self.get_blocked_users_text()
-            await query.edit_message_text(f"Заблокированные пользователи:\n{blocked_users_text}")
+            blocked = self.db.get_blocked_users()
+            text = "\n".join(map(str, blocked)) if blocked else "Заблокированных пользователей нет."
+            await query.answer()
+            await query.edit_message_text(text)
 
         elif data.startswith("unblock_user_"):
-            user_id_to_unblock = int(data.split("_")[-1])
-            self.unblock_user(user_id_to_unblock)
-            await query.edit_message_text(f"✅ Пользователь {user_id_to_unblock} разблокирован.")
-
+            user_id = data.split("_")[-1]
+            self.db.unblock_user(user_id)
+            await query.answer("Пользователь разблокирован")
+            await query.edit_message_text("Пользователь разблокирован.")
+    
         elif data.startswith("block_user_"):
-            user_id_to_block = int(data.split("_")[-1])
-            self.block_user(user_id_to_block)
-            await query.edit_message_text(f"🚫 Пользователь {user_id_to_block} заблокирован.")
+            user_id = data.split("_")[-1]
+            self.db.block_user(user_id)
+            await query.answer("Пользователь заблокирован")
+            await query.edit_message_text("Пользователь заблокирован.")
 
         if data == 'admin_approve':
             await query.edit_message_text("✅ Заявка одобрена.")
