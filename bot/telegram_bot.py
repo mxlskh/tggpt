@@ -37,6 +37,14 @@ class ChatGPTTelegramBot:
     """
     Class representing a ChatGPT Telegram Bot.
     """
+    async def check_access(self, update: Update) -> bool:
+        user = update.effective_user
+        if not self.db.is_approved(user.id):
+            await update.message.reply_text("⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.")
+            return False
+        return True
+
+
     async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.info("⚙️ Вызван image_search")
         logging.info(f"📨 Сообщение: {update.message.text}")
@@ -1307,11 +1315,6 @@ class ChatGPTTelegramBot:
         """
         user = update.effective_user
         user_id = user.id
-
-        if not self.db.is_approved(user_id):
-            self.db.add_join_request(user_id, user.username)  # 🔥 Регистрация заявки
-            await update.message.reply_text("⛔ Доступ ограничен. Ваша заявка отправлена, дождитесь одобрения администратора.")
-            return
 
         commands = self.group_commands if is_group_chat(update) else self.commands
         bot_language = self.config['bot_language']
