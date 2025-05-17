@@ -1223,3 +1223,16 @@ class ChatGPTTelegramBot:
             await query.edit_message_text("❌ Заявка отклонена.")
         else:
             await query.edit_message_text(f"Неизвестное действие: {data}")         
+    async def admin(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_id = update.effective_user.id
+        if not is_admin(self.config, user_id):
+            await update.message.reply_text("❌ У вас нет доступа к этой команде.")
+            return
+
+        keyboard = [
+            [InlineKeyboardButton("Одобрить заявку", callback_data="admin_approve")],
+            [InlineKeyboardButton("Отклонить заявку", callback_data="admin_reject")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await update.message.reply_text("Выберите действие:", reply_markup=reply_markup)
