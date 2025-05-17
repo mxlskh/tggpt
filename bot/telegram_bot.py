@@ -106,6 +106,7 @@ class ChatGPTTelegramBot:
             BotCommand(command='stats', description=localized_text('stats_description', bot_language)),
             BotCommand(command='resend', description=localized_text('resend_description', bot_language))
         ]
+        self.db = Database()
         # If imaging is enabled, add the "image" command to the list
         if self.config.get('enable_image_generation', False):
             self.commands.append(BotCommand(command='image', description=localized_text('image_description', bot_language)))
