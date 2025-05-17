@@ -1088,7 +1088,7 @@ class ChatGPTTelegramBot:
             await update.callback_query.answer(
                 "Заявка отправлена. Ожидайте одобрения администратора.", show_alert=True
             )
-            for admin_id in self.config.ADMIN_USER_IDS:
+            for admin_id in self.config["ADMIN_USER_IDS"]:
                 try:
                     await context.bot.send_message(
                         chat_id=admin_id,
