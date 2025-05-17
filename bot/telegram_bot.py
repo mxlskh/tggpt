@@ -119,6 +119,11 @@ class ChatGPTTelegramBot:
         self.usage = {}
         self.last_message = {}
         self.inline_queries_cache = {}
+        self.admin_user_ids = list(map(int, self.config.get('admin_user_ids', '').split(',')))
+        self.pending_requests = []
+        self.approved_users = set(self.admin_user_ids)
+        self.blocked_users = set()
+
 
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         """
@@ -1182,6 +1187,8 @@ class ChatGPTTelegramBot:
 
         application.add_error_handler(error_handler)
 
+        application.add_handler(CommandHandler('admin', self.admin_panel))
+        application.add_handler(CallbackQueryHandler(self.handle_admin_buttons))
         application.run_polling()
 
 
@@ -1209,3 +1216,53 @@ class ChatGPTTelegramBot:
             [InlineKeyboardButton("Давай начнём", callback_data="start_dialog")]
         ]
         await update.message.reply_text(help_text, reply_markup=InlineKeyboardMarkup(keyboard))
+    async def admin_panel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_id = update.effective_user.id
+        if user_id not in self.admin_user_ids:
+            await update.message.reply_text("У вас нет прав администратора.")
+            return
+
+        keyboard = [
+            [InlineKeyboardButton("🔍 Заявки", callback_data="admin_view_requests")],
+            [InlineKeyboardButton("🚫 Заблокировать", callback_data="admin_block_user")],
+            [InlineKeyboardButton("👥 Одобренные", callback_data="admin_view_approved")],
+        ]
+        await update.message.reply_text("Панель администратора:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    async def handle_admin_buttons(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        user_id = query.from_user.id
+
+        if user_id not in self.admin_user_ids:
+            await query.answer("У вас нет прав администратора.")
+            return
+
+        if query.data == "admin_view_requests":
+            if not self.pending_requests:
+                await query.edit_message_text("Нет новых заявок.")
+            else:
+                for request_id in self.pending_requests:
+                    user_info = f"ID: {request_id}"
+                    buttons = [
+                        InlineKeyboardButton("✅ Принять", callback_data=f"admin_accept_{request_id}"),
+                        InlineKeyboardButton("❌ Отклонить", callback_data=f"admin_reject_{request_id}")
+                    ]
+                    await query.message.reply_text(user_info, reply_markup=InlineKeyboardMarkup([buttons]))
+
+        elif query.data.startswith("admin_accept_"):
+            uid = int(query.data.split("_")[-1])
+            self.approved_users.add(uid)
+            self.pending_requests.remove(uid)
+            await query.edit_message_text(f"✅ Пользователь {uid} одобрен.")
+
+        elif query.data.startswith("admin_reject_"):
+            uid = int(query.data.split("_")[-1])
+            self.pending_requests.remove(uid)
+            await query.edit_message_text(f"❌ Пользователь {uid} отклонён.")
+
+        elif query.data == "admin_view_approved":
+            approved_list = "\n".join(map(str, self.approved_users))
+            await query.edit_message_text(f"✅ Одобренные пользователи:\n{approved_list}")
+
+        elif query.data == "admin_block_user":
+            await query.edit_message_text("Ответьте на сообщение пользователя, которого нужно заблокировать.")
