@@ -33,6 +33,7 @@ from datetime import datetime
 from database import Database
 
 
+
 class ChatGPTTelegramBot:
     """
     Class representing a ChatGPT Telegram Bot.
