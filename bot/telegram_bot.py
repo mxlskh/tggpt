@@ -1329,6 +1329,7 @@ class ChatGPTTelegramBot:
         await query.answer()  # обязательно отвечаем на callback_query, чтобы убрать "часики" в UI
 
         data = query.data
+        logging.info(f"Admin button pressed: {data}")
             # Здесь можете обработать разные действия в зависимости от data
         if data == "admin_list_users":
             # Получить список пользователей и показать
