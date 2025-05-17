@@ -29,6 +29,8 @@ from utils import is_group_chat, get_thread_id, message_text, wrap_with_indicato
 from openai_helper import OpenAIHelper, localized_text
 from usage_tracker import UsageTracker
 
+from datetime import datetime
+
 
 class ChatGPTTelegramBot:
     """
@@ -121,6 +123,77 @@ class ChatGPTTelegramBot:
         self.inline_queries_cache = {}
         admin_ids_str = os.getenv("ADMIN_USER_IDS", "")
         self.admin_user_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip().isdigit()]
+        os.makedirs(self.DATA_DIR, exist_ok=True)
+        DATA_DIR = "data"
+
+    def load_json(self, filename):
+        path = os.path.join(self.DATA_DIR, filename)
+        if not os.path.exists(path):
+            return {} if filename.endswith(".json") else []
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def save_json(self, filename, data):
+        path = os.path.join(self.DATA_DIR, filename)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    def get_users(self):
+        return self.load_json("users.json")
+
+    def get_requests(self):
+        return self.load_json("join_requests.json")
+
+    def get_blocked_users(self):
+        return self.load_json("blocked_users.json")
+
+    def add_join_request(self, user_id: int, username: str):
+        users = self.load_json("users.json")
+        if str(user_id) not in users:
+            users[str(user_id)] = {
+                "username": username,
+                "status": "pending"
+            }
+            self.save_json("users.json", users)
+
+    def approve_request(self, user_id):
+        requests = self.get_requests()
+        users = self.get_users()
+        user_id = str(user_id)
+
+        if user_id in requests:
+            users[user_id] = {
+                "name": requests[user_id]["name"],
+                "joined": str(datetime.now().date())
+            }
+            del requests[user_id]
+            self.save_json("users.json", users)
+            self.save_json("join_requests.json", requests)
+
+    def reject_request(self, user_id):
+        requests = self.get_requests()
+        user_id = str(user_id)
+        if user_id in requests:
+            del requests[user_id]
+            self.save_json("join_requests.json", requests)
+
+    def block_user(self, user_id):
+        blocked = self.get_blocked_users()
+        user_id = int(user_id)
+        if user_id not in blocked:
+            blocked.append(user_id)
+            self.save_json("blocked_users.json", blocked)
+
+        # удалить из пользователей
+        users = self.get_users()
+        users.pop(str(user_id), None)
+        self.save_json("users.json", users)
+
+    def unblock_user(self, user_id):
+        blocked = self.get_blocked_users()
+        user_id = int(user_id)
+        if user_id in blocked:
+            blocked.remove(user_id)
+            self.save_json("blocked_users.json", blocked)
 
     def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_user_ids
@@ -1196,6 +1269,9 @@ class ChatGPTTelegramBot:
         """
         Shows the help menu and a button to start dialog.
         """
+        user = update.effective_user
+        self.add_join_request(user.id, user.username)  # 🔥 Регистрация заявки
+
         commands = self.group_commands if is_group_chat(update) else self.commands
         bot_language = self.config['bot_language']
         commands_description = [f'/{command.command} - {command.description}' for command in commands]
@@ -1222,21 +1298,61 @@ class ChatGPTTelegramBot:
 
         data = query.data
             # Здесь можете обработать разные действия в зависимости от data
+        if data == "admin_list_users":
+            # Получить список пользователей и показать
+            users_list = self.get_users_list_text()
+            await query.edit_message_text(f"Пользователи:\n{users_list}")
+
+        elif data == "admin_view_requests":
+            # Показать заявки с кнопками "Одобрить" / "Отклонить" для каждой заявки
+            requests_text, keyboard = self.get_requests_keyboard()
+            await query.edit_message_text(requests_text, reply_markup=keyboard)
+
+        elif data == "admin_view_requests":
+            # Показать заявки с кнопками "Одобрить" / "Отклонить" для каждой заявки
+            requests_text, keyboard = self.get_requests_keyboard()
+            await query.edit_message_text(requests_text, reply_markup=keyboard)
+
+        elif data.startswith("approve_request_"):
+            user_id_to_approve = int(data.split("_")[-1])
+            self.approve_request(user_id_to_approve)
+            await query.edit_message_text(f"✅ Заявка пользователя {user_id_to_approve} одобрена.")
+    
+        elif data.startswith("reject_request_"):
+            user_id_to_reject = int(data.split("_")[-1])
+            self.reject_request(user_id_to_reject)
+            await query.edit_message_text(f"❌ Заявка пользователя {user_id_to_reject} отклонена.")
+
+        elif data == "admin_blocked_users":
+            blocked_users_text = self.get_blocked_users_text()
+            await query.edit_message_text(f"Заблокированные пользователи:\n{blocked_users_text}")
+
+        elif data.startswith("unblock_user_"):
+            user_id_to_unblock = int(data.split("_")[-1])
+            self.unblock_user(user_id_to_unblock)
+            await query.edit_message_text(f"✅ Пользователь {user_id_to_unblock} разблокирован.")
+
+        elif data.startswith("block_user_"):
+            user_id_to_block = int(data.split("_")[-1])
+            self.block_user(user_id_to_block)
+            await query.edit_message_text(f"🚫 Пользователь {user_id_to_block} заблокирован.")
+
         if data == 'admin_approve':
             await query.edit_message_text("✅ Заявка одобрена.")
         elif data == 'admin_reject':
             await query.edit_message_text("❌ Заявка отклонена.")
         else:
             await query.edit_message_text(f"Неизвестное действие: {data}")         
-    async def admin(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def admin_pannel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         if not is_admin(self.config, user_id):
             await update.message.reply_text("❌ У вас нет доступа к этой команде.")
             return
 
         keyboard = [
-            [InlineKeyboardButton("Одобрить заявку", callback_data="admin_approve")],
-            [InlineKeyboardButton("Отклонить заявку", callback_data="admin_reject")]
+            [InlineKeyboardButton("📋 Просмотреть участников", callback_data="admin_list_users")],
+            [InlineKeyboardButton("📝 Заявки на вступление", callback_data="admin_view_requests")],
+            [InlineKeyboardButton("🚫 Заблокированные пользователи", callback_data="admin_blocked_users")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("Выберите действие:", reply_markup=reply_markup)
+        await update.message.reply_text("Админ-панель:", reply_markup=reply_markup)
