@@ -1064,45 +1064,40 @@ class ChatGPTTelegramBot:
         # Обработка начала диалога с учётом одобрения пользователя
         if callback_data == "start_dialog":
             if self.db.is_approved(user_id):
-            # Если пользователь одобрен — показываем выбор роли
+                # Если пользователь одобрен — показываем выбор роли
                 keyboard = [
                     [InlineKeyboardButton("Преподаватель", callback_data="role_teacher")],
                     [InlineKeyboardButton("Ученик", callback_data="role_student")]
-            ]
-            await update.callback_query.edit_message_text(
+                ]
+                await update.callback_query.edit_message_text(
                     "Выберите, кто вы:", reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-            return
-
-        # Если заявка уже подана — уведомляем
-        if str(user_id) in self.db.get_requests():
-            await update.callback_query.answer(
-                "Вы уже подали заявку. Ожидайте одобрения администратора.", show_alert=True
-            )
-            return
-
-        # Иначе — добавляем заявку в базу
-        requests = self.db.get_requests()
-        requests[str(user_id)] = {"name": username}
-        self.db.save_json("join_requests.json", requests)
-        await update.callback_query.answer(
-            "Заявка отправлена. Ожидайте одобрения администратора.", show_alert=True
-        )
-
-        print(f"Отправляю уведомления администраторам: {self.config.ADMIN_USER_IDS} для пользователя {username} (ID: {user_id})")
-
-        for admin_id in self.config.ADMIN_USER_IDS:
-            try:
-                await context.bot.send_message(
-                    chat_id=admin_id,
-                    text=f"📨 Новая заявка от пользователя:\n\n👤 {username} (ID: {user_id})"
                 )
-                print(f"Уведомление отправлено админу {admin_id}")
-            except Exception as e:
-                print(f"❗ Ошибка при уведомлении админа {admin_id}: {e}")
+                return
+
+            # Если заявка уже подана — уведомляем
+            if str(user_id) in self.db.get_requests():
+                await update.callback_query.answer(
+                    "Вы уже подали заявку. Ожидайте одобрения администратора.", show_alert=True
+                )
+                return
+
+            # Иначе — добавляем заявку в базу
+            requests = self.db.get_requests()
+            requests[str(user_id)] = {"name": username}
+            self.db.save_json("join_requests.json", requests)
+            await update.callback_query.answer(
+                "Заявка отправлена. Ожидайте одобрения администратора.", show_alert=True
+            )
+            for admin_id in self.config.ADMIN_USER_IDS:
+                try:
+                    await context.bot.send_message(
+                        chat_id=admin_id,
+                        text=f"📨 Новая заявка от пользователя:\n\n👤 {username} (ID: {user_id})"
+                    )
+                except Exception as e:
+                    print(f"❗ Ошибка при уведомлении админа {admin_id}: {e}")
 
             return
-
         if not await self.check_access(update):
             await update.callback_query.answer(
             "⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.",
