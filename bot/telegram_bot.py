@@ -1051,13 +1051,6 @@ class ChatGPTTelegramBot:
         user_id = user.id
         username = user.username or user.full_name
 
-        # Проверяем доступ к боту (например, если заблокирован)
-        if not await self.check_access(update):
-            await update.callback_query.answer(
-                "⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.",
-                show_alert=True
-            )
-            return
 
         # Обработка начала диалога с учётом одобрения пользователя
         if callback_data == "start_dialog":
@@ -1085,6 +1078,12 @@ class ChatGPTTelegramBot:
             self.db.save_json("join_requests.json", requests)
             await update.callback_query.answer(
                 "Заявка отправлена. Ожидайте одобрения администратора.", show_alert=True
+            )
+            return
+        if not await self.check_access(update):
+            await update.callback_query.answer(
+            "⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.",
+            show_alert=True
             )
             return
 
