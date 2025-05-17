@@ -134,10 +134,10 @@ class ChatGPTTelegramBot:
         self.usage = {}
         self.last_message = {}
         self.inline_queries_cache = {}
-        admin_ids_str = os.getenv("admin_user_ids", "")
+        admin_ids_str = os.getenv("ADMIN_USER_IDS", "")
         self.admin_user_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip().isdigit()]
         self.DATA_DIR = "data"
-        os.makedirs(self.DATA_DIR, exist_ok=True)\
+        os.makedirs(self.DATA_DIR, exist_ok=True)
 
     def load_json(self, filename):
         path = os.path.join(self.DATA_DIR, filename)
