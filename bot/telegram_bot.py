@@ -1429,13 +1429,19 @@ class ChatGPTTelegramBot:
          
     async def handle_admin_buttons(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
-        print(f"[DEBUG] Callback data type: {type(query.data)}, value: {query.data}")
-        print("===> handle_admin_buttons called")
-        await query.answer()  # обязательно отвечаем на callback_query, чтобы убрать "часики" в UI
-
         data = query.data
-        logging.info(f"Admin button pressed: {data}")
-            # Здесь можете обработать разные действия в зависимости от data
+
+        # Проверка типа данных callback_query.data
+        if not isinstance(data, str):
+            logging.error(f"callback_query.data is not a string! type: {type(data)}, value: {data}")
+            await query.answer("Ошибка данных кнопки", show_alert=True)
+            return
+
+        print(f"[DEBUG] Callback data type: {type(data)}, value: {data}")
+        print("===> handle_admin_buttons called")
+
+        await query.answer()  # обязательно отвечаем на callback_query, чтобы убрать "часики" в UI
+        
         if data == "admin_list_users":
             users = self.db.get_users()
             text = "\n".join([f"{uid} — {info.get('username', 'Без имени')}" for uid, info in users.items()])
