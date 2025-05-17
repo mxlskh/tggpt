@@ -7,6 +7,8 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 class Database:
     def __init__(self, data_dir="data", admin_user_ids=None):
         self.DATA_DIR = data_dir
+        if not os.path.exists(self.DATA_DIR):
+            os.makedirs(self.DATA_DIR)
         self.admin_user_ids = admin_user_ids or []
 
     def load_json(self, filename):
