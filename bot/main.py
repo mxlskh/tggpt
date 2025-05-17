@@ -75,7 +75,8 @@ def main():
 
     admin_ids_str = os.environ.get('ADMIN_USER_IDS', '')
     admin_user_ids = [int(uid.strip()) for uid in admin_ids_str.split(',') if uid.strip().isdigit()]
-    
+    logging.info(f"[CONFIG] Loaded admin IDs: {admin_user_ids}")
+
     telegram_config = {
         'token': os.environ['TELEGRAM_BOT_TOKEN'],
         'admin_user_ids': admin_user_ids,  # ✅ правильный список чисел
