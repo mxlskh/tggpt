@@ -136,6 +136,8 @@ class ChatGPTTelegramBot:
         self.inline_queries_cache = {}
         admin_ids_str = os.getenv("ADMIN_USER_IDS", "")
         self.admin_user_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip().isdigit()]
+        allowed_user_ids_str = os.getenv("allowed_user_ids", "") 
+        allowed_user_ids = [x.strip() for x in allowed_user_ids_str.split(",") if x.strip()]
         self.DATA_DIR = "data"
         os.makedirs(self.DATA_DIR, exist_ok=True)
 
@@ -456,7 +458,7 @@ class ChatGPTTelegramBot:
                 user_id = update.message.from_user.id
                 self.usage[user_id].add_image_request(image_size, self.config['image_prices'])
                 # add guest chat request to guest usage tracker
-                if str(user_id) not in self.config['allowed_user_ids'].split(',') and 'guests' in self.usage:
+                if str(user_id) not in self.config['allowed_user_ids'] and 'guests' in self.usage:
                     self.usage["guests"].add_image_request(image_size, self.config['image_prices'])
 
             except Exception as e:
@@ -505,7 +507,7 @@ class ChatGPTTelegramBot:
                 user_id = update.message.from_user.id
                 self.usage[user_id].add_tts_request(text_length, self.config['tts_model'], self.config['tts_prices'])
                 # add guest chat request to guest usage tracker
-                if str(user_id) not in self.config['allowed_user_ids'].split(',') and 'guests' in self.usage:
+                if str(user_id) not in self.config['allowed_user_ids'] and 'guests' in self.usage:
                     self.usage["guests"].add_tts_request(text_length, self.config['tts_model'], self.config['tts_prices'])
 
             except Exception as e:
@@ -583,7 +585,7 @@ class ChatGPTTelegramBot:
                 transcription_price = self.config['transcription_price']
                 self.usage[user_id].add_transcription_seconds(audio_track.duration_seconds, transcription_price)
 
-                allowed_user_ids = self.config['allowed_user_ids'].split(',')
+                allowed_user_ids = self.config['allowed_user_ids']
                 if str(user_id) not in allowed_user_ids and 'guests' in self.usage:
                     self.usage["guests"].add_transcription_seconds(audio_track.duration_seconds, transcription_price)
 
@@ -832,7 +834,7 @@ class ChatGPTTelegramBot:
             vision_token_price = self.config['vision_token_price']
             self.usage[user_id].add_vision_tokens(total_tokens, vision_token_price)
 
-            allowed_user_ids = self.config['allowed_user_ids'].split(',')
+            allowed_user_ids = self.config['allowed_user_ids']
             if str(user_id) not in allowed_user_ids and 'guests' in self.usage:
                 self.usage["guests"].add_vision_tokens(total_tokens, vision_token_price)
 
