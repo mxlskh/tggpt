@@ -119,7 +119,11 @@ class ChatGPTTelegramBot:
         self.usage = {}
         self.last_message = {}
         self.inline_queries_cache = {}
+        admin_ids_str = os.getenv("ADMIN_USER_IDS", "")
+        self.admin_user_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip().isdigit()]
 
+    def is_admin(self, user_id: int) -> bool:
+        return user_id in self.admin_user_ids
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         """
         Shows the help menu.
@@ -1155,6 +1159,7 @@ class ChatGPTTelegramBot:
             .concurrent_updates(True) \
             .build()
 
+        application.add_handler(CommandHandler('admin', self.admin))
         application.add_handler(CommandHandler('reset', self.reset))
         application.add_handler(CommandHandler("image_search", self.image_search))
         self.commands.append(BotCommand(command="image_search", description="Поиск изображения через DuckDuckGo"))
@@ -1234,5 +1239,4 @@ class ChatGPTTelegramBot:
             [InlineKeyboardButton("Отклонить заявку", callback_data="admin_reject")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-
         await update.message.reply_text("Выберите действие:", reply_markup=reply_markup)
