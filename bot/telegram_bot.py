@@ -1094,6 +1094,15 @@ class ChatGPTTelegramBot:
             "⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.",
             show_alert=True
             )
+
+            for admin_id in self.config.ADMIN_USER_IDS:
+                try:
+                    await context.bot.send_message(
+                        chat_id=admin_id,
+                        text=f"📨 Новая заявка от пользователя:\n\n👤 {username} (ID: {user_id})"
+                    )
+                except Exception as e:
+                    print(f"❗ Ошибка при уведомлении админа {admin_id}: {e}")
             return
 
         elif callback_data == "role_teacher":
