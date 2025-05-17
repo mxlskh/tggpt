@@ -195,6 +195,38 @@ class ChatGPTTelegramBot:
             blocked.remove(user_id)
             self.save_json("blocked_users.json", blocked)
 
+    def get_users_list_text(self):
+        users = self.get_users()
+        if not users:
+            return "Пользователей нет."
+        lines = []
+        for uid, info in users.items():
+            name = info.get("username") or info.get("name") or "Без имени"
+            status = info.get("status", "участник")
+            lines.append(f"{uid} — {name} ({status})")
+        return "\n".join(lines)
+
+    def get_requests_keyboard(self):
+        requests = self.get_requests()
+        if not requests:
+            return "Заявок нет.", None
+        text_lines = []
+        keyboard = []
+        for uid, info in requests.items():
+            name = info.get("username") or info.get("name") or "Без имени"
+            text_lines.append(f"{uid} — {name}")
+            keyboard.append([
+                InlineKeyboardButton("Одобрить", callback_data=f"approve_request_{uid}"),
+                InlineKeyboardButton("Отклонить", callback_data=f"reject_request_{uid}")
+            ])
+        return "\n".join(text_lines), InlineKeyboardMarkup(keyboard)
+
+    def get_blocked_users_text(self):
+        blocked = self.get_blocked_users()
+        if not blocked:
+            return "Заблокированных пользователей нет."
+        return "\n".join([str(uid) for uid in blocked])    
+
     def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_user_ids
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1302,11 +1334,6 @@ class ChatGPTTelegramBot:
             # Получить список пользователей и показать
             users_list = self.get_users_list_text()
             await query.edit_message_text(f"Пользователи:\n{users_list}")
-
-        elif data == "admin_view_requests":
-            # Показать заявки с кнопками "Одобрить" / "Отклонить" для каждой заявки
-            requests_text, keyboard = self.get_requests_keyboard()
-            await query.edit_message_text(requests_text, reply_markup=keyboard)
 
         elif data == "admin_view_requests":
             # Показать заявки с кнопками "Одобрить" / "Отклонить" для каждой заявки
