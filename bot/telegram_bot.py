@@ -242,29 +242,7 @@ class ChatGPTTelegramBot:
 
     def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_user_ids
-    async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
-        if not await self.check_access(update):
-            return  # Пользователь не одобрен — прерываем выполнение
-        """
-        Shows the help menu.
-        """
-        commands = self.group_commands if is_group_chat(update) else self.commands
-        commands_description = [f'/{command.command} - {command.description}' for command in commands]
-        bot_language = self.config['bot_language']
-
-        help_localized = localized_text('help_text', bot_language)
-        
-        help_text = (
-        help_localized[0] +
-        '\n\n' +
-        '\n'.join(commands_description) +
-        '\n\n' +
-        help_localized[1] +
-        '\n\n' +
-        (help_localized[2] if len(help_localized) > 2 else '')
-    )
-        await update.message.reply_text(help_text, disable_web_page_preview=True)
-        
+    
     async def stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         Returns token usage statistics for current day and month.
