@@ -1462,6 +1462,7 @@ class ChatGPTTelegramBot:
             for uid, info in requests.items():
                 name = info.get("name", "Без имени")
                 text_lines.append(f"{uid} — {name}")
+                str_uid = str(uid)
                 keyboard.append([
                     InlineKeyboardButton("✅ Одобрить", callback_data=f"approve_request_{uid}"),
                     InlineKeyboardButton("❌ Отклонить", callback_data=f"reject_request_{uid}")
