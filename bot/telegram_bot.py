@@ -1378,6 +1378,20 @@ class ChatGPTTelegramBot:
         """
         user = update.effective_user
         user_id = user.id
+        username = user.username or user.full_name
+
+        if not self.db.is_approved(user_id):
+            if str(user_id) in self.db.get_requests():
+                await update.message.reply_text("Вы уже подали заявку. Ожидайте одобрения администратора.")
+            else:
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📨 Подать заявку", callback_data="start_dialog")]
+                ])
+                await update.message.reply_text(
+                    "👋 Добро пожаловать! Чтобы получить доступ к функциям бота, подайте заявку:",
+                    reply_markup=keyboard
+                )
+            return
 
         if not await is_allowed(self.config, update, _):
             logging.warning(f'User {update.effective_user.full_name} (id: {user_id}) is not allowed to use /help')
