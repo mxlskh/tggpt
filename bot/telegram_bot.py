@@ -119,7 +119,8 @@ class ChatGPTTelegramBot:
         self.usage = {}
         self.last_message = {}
         self.inline_queries_cache = {}
-        self.admin_user_ids = list(map(int, self.config.get('admin_user_ids', '').split(',')))
+        raw_ids = self.config.get('admin_user_ids', '')
+        self.admin_user_ids = [int(uid.strip()) for uid in raw_ids.split(',') if uid.strip().isdigit()]
         self.pending_requests = []
         self.approved_users = set(self.admin_user_ids)
         self.blocked_users = set()
