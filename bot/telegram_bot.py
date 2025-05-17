@@ -1046,17 +1046,46 @@ class ChatGPTTelegramBot:
         """
         Handle the callback query from the inline query result
         """
-        if not await self.check_access(update):
-            await update.callback_query.answer("⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.", show_alert=True)
-            return
         callback_data = update.callback_query.data
-        # Custom role/language selection
+        user = update.effective_user
+        user_id = user.id
+        username = user.username or user.full_name
+
+        # Проверяем доступ к боту (например, если заблокирован)
+        if not await self.check_access(update):
+            await update.callback_query.answer(
+                "⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.",
+                show_alert=True
+            )
+            return
+
+        # Обработка начала диалога с учётом одобрения пользователя
         if callback_data == "start_dialog":
-            keyboard = [
-                [InlineKeyboardButton("Преподаватель", callback_data="role_teacher")],
-                [InlineKeyboardButton("Ученик", callback_data="role_student")]
-            ]
-            await update.callback_query.edit_message_text("Выберите, кто вы:", reply_markup=InlineKeyboardMarkup(keyboard))
+            if self.db.is_approved(user_id):
+                # Если пользователь одобрен — показываем выбор роли
+                keyboard = [
+                    [InlineKeyboardButton("Преподаватель", callback_data="role_teacher")],
+                    [InlineKeyboardButton("Ученик", callback_data="role_student")]
+                ]
+                await update.callback_query.edit_message_text(
+                    "Выберите, кто вы:", reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+                return
+
+            # Если заявка уже подана — уведомляем
+            if str(user_id) in self.db.get_requests():
+                await update.callback_query.answer(
+                    "Вы уже подали заявку. Ожидайте одобрения администратора.", show_alert=True
+                )
+                return
+
+            # Иначе — добавляем заявку в базу
+            requests = self.db.get_requests()
+            requests[str(user_id)] = {"name": username}
+            self.db.save_json("join_requests.json", requests)
+            await update.callback_query.answer(
+                "Заявка отправлена. Ожидайте одобрения администратора.", show_alert=True
+            )
             return
 
         elif callback_data == "role_teacher":
@@ -1064,7 +1093,9 @@ class ChatGPTTelegramBot:
                 [InlineKeyboardButton(lang, callback_data=f"teacher_lang_{lang.lower()}")]
                 for lang in ["Английский", "Китайский", "Французский", "Немецкий", "Итальянский", "Польский"]
             ]
-            await update.callback_query.edit_message_text("Выберите язык преподавания:", reply_markup=InlineKeyboardMarkup(keyboard))
+            await update.callback_query.edit_message_text(
+                "Выберите язык преподавания:", reply_markup=InlineKeyboardMarkup(keyboard)
+            )
             return
 
         elif callback_data == "role_student":
@@ -1072,7 +1103,9 @@ class ChatGPTTelegramBot:
                 [InlineKeyboardButton(lang, callback_data=f"student_lang_{lang.lower()}")]
                 for lang in ["Английский", "Китайский", "Французский", "Немецкий", "Итальянский", "Польский"]
             ]
-            await update.callback_query.edit_message_text("Выберите язык изучения:", reply_markup=InlineKeyboardMarkup(keyboard))
+            await update.callback_query.edit_message_text(
+                "Выберите язык изучения:", reply_markup=InlineKeyboardMarkup(keyboard)
+            )
             return
 
         elif callback_data.startswith("teacher_lang_"):
