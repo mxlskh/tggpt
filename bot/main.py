@@ -73,6 +73,9 @@ def main():
         logging.warning('The environment variable MONTHLY_GUEST_BUDGET is deprecated. '
                         'Please use GUEST_BUDGET with BUDGET_PERIOD instead.')
 
+    admin_ids_str = os.environ.get('ADMIN_USER_IDS', '')
+    admin_user_ids = [int(uid.strip()) for uid in admin_ids_str.split(',') if uid.strip().isdigit()]
+    
     telegram_config = {
         'token': os.environ['TELEGRAM_BOT_TOKEN'],
         'admin_user_ids': os.environ.get('ADMIN_USER_IDS', '-'),
