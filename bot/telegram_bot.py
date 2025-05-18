@@ -134,10 +134,8 @@ class ChatGPTTelegramBot:
         self.usage = {}
         self.last_message = {}
         self.inline_queries_cache = {}
-        admin_ids_str = os.getenv("ADMIN_USER_IDS", "")
-        self.admin_user_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip().isdigit()]
-        allowed_user_ids_str = os.getenv("allowed_user_ids", "") 
-        allowed_user_ids = [x.strip() for x in allowed_user_ids_str.split(",") if x.strip()]
+        self.admin_user_ids = config.get("admin_user_ids", [])
+        self.allowed_user_ids = config.get("allowed_user_ids", [])
         self.DATA_DIR = "data"
         os.makedirs(self.DATA_DIR, exist_ok=True)
 
@@ -1519,10 +1517,11 @@ class ChatGPTTelegramBot:
         elif data == 'admin_reject':
             await query.edit_message_text("❌ Заявка отклонена.")
         else:
-            await query.edit_message_text(f"Неизвестное действие: {data}")         
+            await query.edit_message_text(f"Неизвестное действие: {data}")  
+
     async def admin_panel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
-        if not is_admin(self.config, user_id):
+        if not self.is_admin(user_id):  # <-- исправлено
             await update.message.reply_text("❌ У вас нет доступа к этой команде.")
             return
 
