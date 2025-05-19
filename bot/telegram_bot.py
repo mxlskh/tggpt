@@ -31,21 +31,29 @@ from openai_helper import OpenAIHelper, localized_text
 from usage_tracker import UsageTracker
 
 from datetime import datetime
-from database import Database
+from supabase_client import SupabaseClient
 
 
 
 class ChatGPTTelegramBot:
-    """
-    Class representing a ChatGPT Telegram Bot.
-    """
+    def __init__(self):
+        url = os.getenv("SUPABASE_URL")
+        key = os.getenv("SUPABASE_ANON_KEY")
+        self.supabase = SupabaseClient()
+
     async def check_access(self, update: Update) -> bool:
-        user = update.effective_user
-        if not self.db.is_approved(user.id):
+        user_id = update.effective_user.id
+        # Запрос к таблице пользователей Supabase
+        response = self.supabase.table("users").select("approved").eq("user_id", user_id).execute()
+        if response.error:
+            await update.message.reply_text("Ошибка проверки доступа, попробуйте позже.")
+            return False
+        
+        users = response.data
+        if not users or not users[0].get("approved", False):
             await update.message.reply_text("⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.")
             return False
         return True
-
 
     async def image_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await self.check_access(update):
@@ -103,7 +111,6 @@ class ChatGPTTelegramBot:
             logging.error(f"❌ Ошибка: {e}")
             await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
 
-
     def __init__(self, config: dict, openai: OpenAIHelper):
         """
         Initializes the bot with the given configuration and GPT bot object.
@@ -112,15 +119,17 @@ class ChatGPTTelegramBot:
         """
         self.config = config
         self.openai = openai
+        self.supabase = SupabaseClient()  # 🔄 Заменили self.db на supabase
         bot_language = self.config['bot_language']
+
         self.commands = [
             BotCommand(command='help', description=localized_text('help_description', bot_language)),
             BotCommand(command='reset', description=localized_text('reset_description', bot_language)),
             BotCommand(command='stats', description=localized_text('stats_description', bot_language)),
             BotCommand(command='resend', description=localized_text('resend_description', bot_language))
         ]
-        self.db = Database(data_dir="data", admin_user_ids=config.get("admin_user_ids", []))
-        # If imaging is enabled, add the "image" command to the list
+
+        # Команды по фичам
         if self.config.get('enable_image_generation', False):
             self.commands.append(BotCommand(command='image', description=localized_text('image_description', bot_language)))
 
@@ -130,114 +139,44 @@ class ChatGPTTelegramBot:
         self.group_commands = [BotCommand(
             command='chat', description=localized_text('chat_description', bot_language)
         )] + self.commands
+
+        # Остальные переменные
         self.disallowed_message = localized_text('disallowed', bot_language)
         self.budget_limit_message = localized_text('budget_limit', bot_language)
         self.usage = {}
         self.last_message = {}
         self.inline_queries_cache = {}
+
         self.admin_user_ids = config.get("admin_user_ids", [])
-        self.allowed_user_ids = config.get("allowed_user_ids", [])
+        self.allowed_user_ids = config.get("allowed_user_ids", [])  # Возможно, больше не нужен
         self.DATA_DIR = "data"
         os.makedirs(self.DATA_DIR, exist_ok=True)
 
-    def load_json(self, filename):
-        path = os.path.join(self.DATA_DIR, filename)
-        if not os.path.exists(path):
-            return {} if filename.endswith(".json") else []
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-
-    def save_json(self, filename, data):
-        path = os.path.join(self.DATA_DIR, filename)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-    def get_users(self):
-        return self.load_json("users.json")
-
-    def get_requests(self):
-        return self.load_json("join_requests.json")
-
-    def get_blocked_users(self):
-        return self.load_json("blocked_users.json")
-
-    def add_join_request(self, user_id: int, username: str):
-        users = self.load_json("users.json")
-        if str(user_id) not in users:
-            users[str(user_id)] = {
-                "username": username,
-                "status": "pending"
-            }
-            self.save_json("users.json", users)
-
-    async def approve_request(self, user_id, bot):
-        requests = self.get_requests()
-        users = self.get_users()
-        user_id = str(user_id)
-
-        if user_id in requests:
-            users[user_id] = {
-                "username": requests[user_id].get("username") or requests[user_id].get("name"),
-                "status": "approved",
-                "joined": str(datetime.now().date())
-            }
-            del requests[user_id]
-            self.save_json("users.json", users)
-            self.save_json("join_requests.json", requests)
-
-            # Уведомление пользователя
-            try:
-                await bot.send_message(
-                    chat_id=int(user_id),
-                    text="✅ Ваша заявка одобрена! Теперь вы можете использовать функционал бота."
-                )
-            except Exception as e:
-                print(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
-
-    def reject_request(self, user_id):
-        requests = self.get_requests()
-        user_id = str(user_id)
-        if user_id in requests:
-            del requests[user_id]
-            self.save_json("join_requests.json", requests)
-
-    def block_user(self, user_id):
-        blocked = self.get_blocked_users()
-        user_id = int(user_id)
-        if user_id not in blocked:
-            blocked.append(user_id)
-            self.save_json("blocked_users.json", blocked)
-
-        # удалить из пользователей
-        users = self.get_users()
-        users.pop(str(user_id), None)
-        self.save_json("users.json", users)
-
-    def unblock_user(self, user_id):
-        blocked = self.get_blocked_users()
-        user_id = int(user_id)
-        if user_id in blocked:
-            blocked.remove(user_id)
-            self.save_json("blocked_users.json", blocked)
-
     def get_users_list_text(self):
-        users = self.get_users()
+        response = self.client.table("users").select("*").execute()
+        users = response.data
         if not users:
             return "Пользователей нет."
+
         lines = []
-        for uid, info in users.items():
-            name = info.get("username") or info.get("name") or "Без имени"
-            status = info.get("status", "участник")
+        for user in users:
+            uid = user.get("user_id")
+            name = user.get("username") or user.get("name") or "Без имени"
+            status = user.get("status", "участник")
             lines.append(f"{uid} — {name} ({status})")
         return "\n".join(lines)
 
     def get_requests_keyboard(self):
-        requests = self.get_requests()
+        response = self.client.table("join_requests").select("*").execute()
+        requests = response.data
         if not requests:
             return "Заявок нет.", None
+
         text_lines = []
         keyboard = []
-        for uid, info in requests.items():
-            name = info.get("username") or info.get("name") or "Без имени"
+        for req in requests:
+            uid = req.get("user_id")
+            name = req.get("username") or req.get("name") or "Без имени"
             text_lines.append(f"{uid} — {name}")
             keyboard.append([
                 InlineKeyboardButton("Одобрить", callback_data=f"approve_request_{uid}"),
@@ -246,116 +185,130 @@ class ChatGPTTelegramBot:
         return "\n".join(text_lines), InlineKeyboardMarkup(keyboard)
 
     def get_blocked_users_text(self):
-        blocked = self.get_blocked_users()
+        response = self.client.table("blocked_users").select("user_id").execute()
+        blocked = response.data
         if not blocked:
             return "Заблокированных пользователей нет."
-        return "\n".join([str(uid) for uid in blocked])    
+        return "\n".join([str(user["user_id"]) for user in blocked])
+
+    def add_join_request(self, user_id: int, username: str):
+        self.client.table("join_requests").upsert({
+            "user_id": user_id,
+            "username": username
+        }).execute()
+
+    async def approve_request(self, user_id, username, bot):
+        # Добавляем в users
+        self.client.table("users").upsert({
+            "user_id": user_id,
+            "username": username,
+            "status": "approved",
+            "joined": str(datetime.now().date())
+        }).execute()
+
+        # Удаляем из join_requests
+        self.client.table("join_requests").delete().eq("user_id", user_id).execute()
+
+        try:
+            await bot.send_message(
+                chat_id=int(user_id),
+                text="✅ Ваша заявка одобрена! Теперь вы можете использовать функционал бота."
+            )
+        except Exception as e:
+            print(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
+
+    def reject_request(self, user_id):
+        self.client.table("join_requests").delete().eq("user_id", user_id).execute()
+
+    def block_user(self, user_id):
+        self.client.table("blocked_users").upsert({"user_id": user_id}).execute()
+        self.client.table("users").delete().eq("user_id", user_id).execute()
+
+    def unblock_user(self, user_id):
+        self.client.table("blocked_users").delete().eq("user_id", user_id).execute()
 
     def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_user_ids
     
+    def format_usage_section(title, tokens, images, vision, tts, minutes, seconds, cost, config, lang):
+        section = f"*{title}:*\n"
+        section += f"{tokens} {localized_text('stats_tokens', lang)}\n"
+        if config.get('enable_image_generation', False):
+            section += f"{images} {localized_text('stats_images', lang)}\n"
+        if config.get('enable_vision', False):
+            section += f"{vision} {localized_text('stats_vision', lang)}\n"
+        if config.get('enable_tts_generation', False):
+            section += f"{tts} {localized_text('stats_tts', lang)}\n"
+        section += (
+            f"{minutes} {localized_text('stats_transcribe', lang)[0]} "
+            f"{seconds} {localized_text('stats_transcribe', lang)[1]}\n"
+        )
+        section += f"{localized_text('stats_total', lang)}{cost:.2f}\n"
+        section += "----------------------------\n"
+        return section
+
     async def stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """
-        Returns token usage statistics for current day and month.
-        """
         if not await self.check_access(update):
-            logging.warning(f'User {update.message.from_user.name} (id: {update.message.from_user.id}) '
-                        'is not allowed to request their usage statistics')
+            user = update.message.from_user
+            logging.warning(f'User {user.name} (id: {user.id}) is not allowed to request their usage statistics')
             await self.send_disallowed_message(update, context)
             return
 
-        logging.info(f'User {update.message.from_user.name} (id: {update.message.from_user.id}) '
-                 'requested their usage statistics')
+        user = update.message.from_user
+        user_id = user.id
+        username = user.name
+        logging.info(f'User {username} (id: {user_id}) requested their usage statistics')
 
-        user_id = update.message.from_user.id
         if user_id not in self.usage:
-            self.usage[user_id] = UsageTracker(user_id, update.message.from_user.name)
+            self.usage[user_id] = UsageTracker(user_id, username)
 
-        tokens_today, tokens_month = self.usage[user_id].get_current_token_usage()
-        images_today, images_month = self.usage[user_id].get_current_image_count()
-        (transcribe_minutes_today, transcribe_seconds_today, transcribe_minutes_month,
-         transcribe_seconds_month) = self.usage[user_id].get_current_transcription_duration()
-        vision_today, vision_month = self.usage[user_id].get_current_vision_tokens()
-        characters_today, characters_month = self.usage[user_id].get_current_tts_usage()
-        current_cost = self.usage[user_id].get_current_cost()
+        tracker = self.usage[user_id]
+        tokens_today, tokens_month = tracker.get_current_token_usage()
+        images_today, images_month = tracker.get_current_image_count()
+        transcribe_today = tracker.get_current_transcription_duration()
+        vision_today, vision_month = tracker.get_current_vision_tokens()
+        tts_today, tts_month = tracker.get_current_tts_usage()
+        current_cost = tracker.get_current_cost()
 
+        bot_language = self.config['bot_language']
         chat_id = update.effective_chat.id
         chat_messages, chat_token_length = self.openai.get_conversation_stats(chat_id)
-        remaining_budget = get_remaining_budget(self.config, self.usage, update)
-        bot_language = self.config['bot_language']
-        
+
+        # Conversation stats block
         text_current_conversation = (
             f"*{localized_text('stats_conversation', bot_language)[0]}*:\n"
             f"{chat_messages} {localized_text('stats_conversation', bot_language)[1]}\n"
             f"{chat_token_length} {localized_text('stats_conversation', bot_language)[2]}\n"
             "----------------------------\n"
         )
-        
-        # Check if image generation is enabled and, if so, generate the image statistics for today
-        text_today_images = ""
-        if self.config.get('enable_image_generation', False):
-            text_today_images = f"{images_today} {localized_text('stats_images', bot_language)}\n"
 
-        text_today_vision = ""
-        if self.config.get('enable_vision', False):
-            text_today_vision = f"{vision_today} {localized_text('stats_vision', bot_language)}\n"
-
-        text_today_tts = ""
-        if self.config.get('enable_tts_generation', False):
-            text_today_tts = f"{characters_today} {localized_text('stats_tts', bot_language)}\n"
-        
-        text_today = (
-            f"*{localized_text('usage_today', bot_language)}:*\n"
-            f"{tokens_today} {localized_text('stats_tokens', bot_language)}\n"
-            f"{text_today_images}"  # Include the image statistics for today if applicable
-            f"{text_today_vision}"
-            f"{text_today_tts}"
-            f"{transcribe_minutes_today} {localized_text('stats_transcribe', bot_language)[0]} "
-            f"{transcribe_seconds_today} {localized_text('stats_transcribe', bot_language)[1]}\n"
-            f"{localized_text('stats_total', bot_language)}{current_cost['cost_today']:.2f}\n"
-            "----------------------------\n"
-        )
-        
-        text_month_images = ""
-        if self.config.get('enable_image_generation', False):
-            text_month_images = f"{images_month} {localized_text('stats_images', bot_language)}\n"
-
-        text_month_vision = ""
-        if self.config.get('enable_vision', False):
-            text_month_vision = f"{vision_month} {localized_text('stats_vision', bot_language)}\n"
-
-        text_month_tts = ""
-        if self.config.get('enable_tts_generation', False):
-            text_month_tts = f"{characters_month} {localized_text('stats_tts', bot_language)}\n"
-        
-        # Check if image generation is enabled and, if so, generate the image statistics for the month
-        text_month = (
-            f"*{localized_text('usage_month', bot_language)}:*\n"
-            f"{tokens_month} {localized_text('stats_tokens', bot_language)}\n"
-            f"{text_month_images}"  # Include the image statistics for the month if applicable
-            f"{text_month_vision}"
-            f"{text_month_tts}"
-            f"{transcribe_minutes_month} {localized_text('stats_transcribe', bot_language)[0]} "
-            f"{transcribe_seconds_month} {localized_text('stats_transcribe', bot_language)[1]}\n"
-            f"{localized_text('stats_total', bot_language)}{current_cost['cost_month']:.2f}"
+        # Usage blocks
+        text_today = format_usage_section(
+            localized_text('usage_today', bot_language),
+            tokens_today, images_today, vision_today, tts_today,
+            transcribe_today[0], transcribe_today[1],
+            current_cost['cost_today'],
+            self.config, bot_language
         )
 
-        # text_budget filled with conditional content
+        text_month = format_usage_section(
+            localized_text('usage_month', bot_language),
+            tokens_month, images_month, vision_month, tts_month,
+            transcribe_today[2], transcribe_today[3],
+            current_cost['cost_month'],
+            self.config, bot_language
+        )
+
+        # Budget
+        remaining_budget = get_remaining_budget(self.config, self.usage, update)
         text_budget = "\n\n"
-        budget_period = self.config['budget_period']
         if remaining_budget < float('inf'):
+            period = self.config['budget_period']
             text_budget += (
                 f"{localized_text('stats_budget', bot_language)}"
-                f"{localized_text(budget_period, bot_language)}: "
+                f"{localized_text(period, bot_language)}: "
                 f"${remaining_budget:.2f}.\n"
             )
-        # No longer works as of July 21st 2023, as OpenAI has removed the billing API
-        # add OpenAI account information for admin request
-        # if is_admin(self.config, user_id):
-        #     text_budget += (
-        #         f"{localized_text('stats_openai', bot_language)}"
-        #         f"{self.openai.get_billing_current_month():.2f}"
-        #     )
 
         usage_text = text_current_conversation + text_today + text_month + text_budget
         await update.message.reply_text(usage_text, parse_mode=constants.ParseMode.MARKDOWN)
@@ -529,7 +482,6 @@ class ChatGPTTelegramBot:
                 )
 
         await wrap_with_indicator(update, context, _generate, constants.ChatAction.UPLOAD_VOICE)
-
 
     async def transcribe(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -1065,19 +1017,27 @@ class ChatGPTTelegramBot:
             logging.error(f'An error occurred while generating the result card for inline query {e}')
 
     async def handle_callback_inline_query(self, update: Update, context: CallbackContext):
-        """
-        Handle the callback query from the inline query result
-        """
         callback_data = update.callback_query.data
         user = update.effective_user
         user_id = user.id
         username = user.username or user.full_name
 
+        # Проверка одобрения пользователя через supabase
+        def is_approved(user_id: int) -> bool:
+            resp = self.supabase.table('users').select('approved').eq('user_id', user_id).execute()
+            if resp.status_code == 200 and resp.data:
+                return resp.data[0]['approved'] is True
+            return False
 
-        # Обработка начала диалога с учётом одобрения пользователя
+        # Получить все user_id из таблицы join_requests (список заявок)
+        def get_requests() -> set:
+            resp = self.supabase.table('join_requests').select('user_id').execute()
+            if resp.status_code == 200 and resp.data:
+                return set(item['user_id'] for item in resp.data)
+            return set()
+
         if callback_data == "start_dialog":
-            if self.db.is_approved(user_id):
-                # Если пользователь одобрен — показываем выбор роли
+            if is_approved(user_id):
                 keyboard = [
                     [InlineKeyboardButton("Преподаватель", callback_data="role_teacher")],
                     [InlineKeyboardButton("Ученик", callback_data="role_student")]
@@ -1087,20 +1047,29 @@ class ChatGPTTelegramBot:
                 )
                 return
 
-            # Если заявка уже подана — уведомляем
-            if str(user_id) in self.db.get_requests():
+            requests = get_requests()
+            if user_id in requests:
                 await update.callback_query.answer(
                     "Вы уже подали заявку. Ожидайте одобрения администратора.", show_alert=True
                 )
                 return
 
-            # Иначе — добавляем заявку в базу
-            requests = self.db.get_requests()
-            requests[str(user_id)] = {"name": username}
-            self.db.save_json("join_requests.json", requests)
-            await update.callback_query.answer(
-                "Заявка отправлена. Ожидайте одобрения администратора.", show_alert=True
-            )
+            # Добавляем заявку в supabase
+            insert_resp = self.supabase.table('join_requests').insert({
+                'user_id': user_id,
+                'username': username
+            }).execute()
+
+            if insert_resp.status_code == 201:
+                await update.callback_query.answer(
+                    "Заявка отправлена. Ожидайте одобрения администратора.", show_alert=True
+                )
+            else:
+                await update.callback_query.answer(
+                    "Ошибка при отправке заявки. Попробуйте позже.", show_alert=True
+                )
+                return
+
             for admin_id in self.config["admin_user_ids"]:
                 try:
                     await context.bot.send_message(
@@ -1111,11 +1080,13 @@ class ChatGPTTelegramBot:
                     print(f"❗ Ошибка при уведомлении админа {admin_id}: {e}")
 
             return
-        if not await self.check_access(update):
+
+        if not is_approved(user_id):
             await update.callback_query.answer(
-            "⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.",
-            show_alert=True
+                "⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.",
+                show_alert=True
             )
+            return
 
         elif callback_data == "role_teacher":
             keyboard = [
@@ -1281,8 +1252,13 @@ class ChatGPTTelegramBot:
 
     async def check_allowed_and_within_budget(self, update: Update, context: ContextTypes.DEFAULT_TYPE, is_inline=False) -> bool:
         user = update.inline_query.from_user if is_inline else update.message.from_user
+        user_id = user.id
 
-        if not self.db.is_approved(user.id):
+        # Проверка одобрения пользователя через Supabase
+        # Если твой клиент синхронный, тогда убери await и сделай sync запрос
+        resp = await self.supabase.table('users').select('approved').eq('user_id', user_id).execute()
+
+        if resp.status_code != 200 or not resp.data or not resp.data[0].get('approved', False):
             if is_inline:
                 await update.inline_query.answer(results=[], switch_pm_text="⛔️ Доступ запрещён. Подайте заявку.", switch_pm_parameter="start", cache_time=0)
             else:
@@ -1290,8 +1266,6 @@ class ChatGPTTelegramBot:
             return False
 
         name = user.name
-        user_id = user.id
-
         if not await is_allowed(self.config, update, context, is_inline=is_inline):
             logging.warning(f'User {name} (id: {user_id}) is not allowed to use the bot')
             await self.send_disallowed_message(update, context, is_inline)
@@ -1304,41 +1278,38 @@ class ChatGPTTelegramBot:
 
         return True
 
-    async def send_disallowed_message(self, update: Update, _: ContextTypes.DEFAULT_TYPE, is_inline=False, reason="not_allowed"):
-        """
-        Sends the disallowed message to the user.
-        :param reason: причина отказа, например "not_allowed" или "not_approved"
-        """
-        if reason == "not_approved":
-            text = "⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора."
-        else:
-            text = self.disallowed_message
+    async def check_allowed_and_within_budget(self, update: Update, context: ContextTypes.DEFAULT_TYPE, is_inline=False) -> bool:
+        user = update.inline_query.from_user if is_inline else update.message.from_user
+        user_id = user.id
 
-        if not is_inline:
-            await update.effective_message.reply_text(
-                message_thread_id=get_thread_id(update),
-                text=text,
-                disable_web_page_preview=True
-            )
-        else:
-            result_id = str(uuid4())
-            await self.send_inline_query_result(update, result_id, message_content=text)
+        # Получаем данные пользователя из Supabase
+        resp = await self.supabase.table('users').select('approved').eq('user_id', user_id).execute()
 
-    async def send_budget_reached_message(self, update: Update, _: ContextTypes.DEFAULT_TYPE, is_inline=False):
-        """
-        Sends the budget reached message to the user.
-        """
-        text = self.budget_limit_message
+        approved = False
+        if resp.status_code == 200 and resp.data:
+            approved = resp.data[0].get('approved', False)
 
-        if not is_inline:
-            await update.effective_message.reply_text(
-                message_thread_id=get_thread_id(update),
-                text=text
-            )
-        else:
-            result_id = str(uuid4())
-            await self.send_inline_query_result(update, result_id, message_content=text)
+        if not approved:
+            if is_inline:
+                # Можно либо через send_disallowed_message, либо так:
+                await update.inline_query.answer(results=[], switch_pm_text="⛔️ Доступ запрещён. Подайте заявку.", switch_pm_parameter="start", cache_time=0)
+            else:
+                await self.send_disallowed_message(update, context, is_inline=is_inline, reason="not_approved")
+            return False
 
+        name = user.name
+
+        if not await is_allowed(self.config, update, context, is_inline=is_inline):
+            logging.warning(f'User {name} (id: {user_id}) is not allowed to use the bot')
+            await self.send_disallowed_message(update, context, is_inline)
+            return False
+
+        if not is_within_budget(self.config, self.usage, update, is_inline=is_inline):
+            logging.warning(f'User {name} (id: {user_id}) reached their usage limit')
+            await self.send_budget_reached_message(update, context, is_inline)
+            return False
+
+        return True
 
     async def post_init(self, application: Application) -> None:
         """
@@ -1359,6 +1330,7 @@ class ChatGPTTelegramBot:
             .concurrent_updates(True) \
             .build()
 
+        # Добавляем обработчики команд
         application.add_handler(CommandHandler('admin', self.admin_panel))
         application.add_handler(CallbackQueryHandler(self.handle_admin_buttons, pattern="^admin_"))
         application.add_handler(CommandHandler('reset', self.reset))
@@ -1384,14 +1356,16 @@ class ChatGPTTelegramBot:
         application.add_handler(InlineQueryHandler(self.inline_query, chat_types=[
             constants.ChatType.GROUP, constants.ChatType.SUPERGROUP, constants.ChatType.PRIVATE
         ]))
+        # Обработчик для админских кнопок по шаблону
         application.add_handler(CallbackQueryHandler(self.handle_admin_buttons, pattern="^(approve_request_|reject_request_|block_user_|unblock_user_)"))
 
+        # Обработчик ошибок
         application.add_error_handler(error_handler)
 
+        # Обработчик inline callback запросов
         application.add_handler(CallbackQueryHandler(self.handle_callback_inline_query))
+
         application.run_polling()
-
-
 
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         """
@@ -1401,8 +1375,11 @@ class ChatGPTTelegramBot:
         user_id = user.id
         username = user.username or user.full_name
 
-        if not self.db.is_approved(user_id):
-            if str(user_id) in self.db.get_requests():
+        # Асинхронно проверяем одобрение пользователя
+        if not await self.db.is_approved(user_id):
+            # Асинхронно получаем заявки
+            requests = await self.db.get_requests()
+            if str(user_id) in requests:
                 await update.message.reply_text("Вы уже подали заявку. Ожидайте одобрения администратора.")
             else:
                 keyboard = InlineKeyboardMarkup([
@@ -1438,12 +1415,11 @@ class ChatGPTTelegramBot:
             [InlineKeyboardButton("Давай начнём", callback_data="start_dialog")]
         ]
         await update.message.reply_text(help_text, reply_markup=InlineKeyboardMarkup(keyboard))
-         
+
     async def handle_admin_buttons(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         data = query.data
 
-        # Проверка типа данных callback_query.data
         if not isinstance(data, str):
             logging.error(f"callback_query.data is not a string! type: {type(data)}, value: {data}")
             await query.answer("Ошибка данных кнопки", show_alert=True)
@@ -1452,35 +1428,33 @@ class ChatGPTTelegramBot:
         print(f"[DEBUG] Callback data type: {type(data)}, value: {data}")
         print("===> handle_admin_buttons called")
 
-        await query.answer()  # обязательно отвечаем на callback_query, чтобы убрать "часики" в UI
-        
+        await query.answer()
+
         if data == "admin_list_users":
-            users = self.db.get_users()
-            text = "\n".join([f"{uid} — {info.get('username', 'Без имени')}" for uid, info in users.items()])
+            users = await self.db.get_users()
+            text = "\n".join([f"{uid} — {user.get('username', 'Без имени')}" for uid, user in users.items()])
             if not text:
-                 text = "Пользователей нет."
-            await query.answer()
+                text = "Пользователей нет."
             await query.edit_message_text(text)
             return
 
         elif data == "admin_view_requests":
-            requests = self.db.get_requests()
+            requests = await self.db.get_requests()
             if not requests:
-                await query.answer()
                 await query.edit_message_text("Заявок нет.")
                 return
+
             text_lines = []
             keyboard = []
             for uid, info in requests.items():
                 name = info.get("name", "Без имени")
                 text_lines.append(f"{uid} — {name}")
-                str_uid = str(uid)
                 keyboard.append([
                     InlineKeyboardButton("✅ Одобрить", callback_data=f"approve_request_{uid}"),
                     InlineKeyboardButton("❌ Отклонить", callback_data=f"reject_request_{uid}")
                 ])
+
             text = "\n".join(text_lines)
-            await query.answer()
             await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
             return
 
@@ -1488,8 +1462,8 @@ class ChatGPTTelegramBot:
             user_id = data.split("_")[-1]
 
             try:
-                await self.db.approve_request(user_id, context.bot)  # добавили отправку уведомления
-                await query.answer("Заявка одобрена")
+                await self.db.approve_request(user_id)
+                await self.db.send_approval_notification(user_id, context.bot)
                 await query.edit_message_text("✅ Заявка одобрена. Пользователь уведомлён.")
             except Exception as e:
                 logging.error(f"Ошибка при одобрении заявки: {e}")
@@ -1498,29 +1472,25 @@ class ChatGPTTelegramBot:
 
         elif data.startswith("reject_request_"):
             user_id = data.split("_")[-1]
-            self.db.reject_request(user_id)
-            await query.answer("Заявка отклонена")
+            await self.db.reject_request(user_id)
             await query.edit_message_text("Заявка отклонена.")
             return
 
         elif data == "admin_blocked_users":
-            blocked = self.db.get_blocked_users()
+            blocked = await self.db.get_blocked_users()
             text = "\n".join(map(str, blocked)) if blocked else "Заблокированных пользователей нет."
-            await query.answer()
             await query.edit_message_text(text)
             return
 
         elif data.startswith("unblock_user_"):
             user_id = data.split("_")[-1]
-            self.db.unblock_user(user_id)
-            await query.answer("Пользователь разблокирован")
+            await self.db.unblock_user(user_id)
             await query.edit_message_text("Пользователь разблокирован.")
             return
-    
+
         elif data.startswith("block_user_"):
             user_id = data.split("_")[-1]
-            self.db.block_user(user_id)
-            await query.answer("Пользователь заблокирован")
+            await self.db.block_user(user_id)
             await query.edit_message_text("Пользователь заблокирован.")
             return
 
@@ -1529,11 +1499,13 @@ class ChatGPTTelegramBot:
         elif data == 'admin_reject':
             await query.edit_message_text("❌ Заявка отклонена.")
         else:
-            await query.edit_message_text(f"Неизвестное действие: {data}")  
-
+            await query.edit_message_text(f"Неизвестное действие: {data}")
+    
     async def admin_panel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
-        if not self.is_admin(user_id):  # <-- исправлено
+
+        # Проверка прав администратора (предположим, метод self.is_admin использует Supabase или локальный список)
+        if not await self.is_admin(user_id):  # Сделай is_admin асинхронным, если данные идут из Supabase
             await update.message.reply_text("❌ У вас нет доступа к этой команде.")
             return
 
@@ -1543,4 +1515,5 @@ class ChatGPTTelegramBot:
             [InlineKeyboardButton("🚫 Заблокированные пользователи", callback_data="admin_blocked_users")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("Админ-панель:", reply_markup=reply_markup)
+
+        await update.message.reply_text("🛠 Админ-панель:", reply_markup=reply_markup)
