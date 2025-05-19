@@ -77,13 +77,9 @@ def main():
     admin_user_ids = [int(uid.strip()) for uid in admin_ids_str.split(',') if uid.strip().isdigit()]
     logging.info(f"[CONFIG] Loaded admin IDs: {admin_user_ids}")
 
-    allowed_user_ids_str = os.environ.get('ALLOWED_TELEGRAM_USER_IDS', '')
-    allowed_user_ids = [uid.strip() for uid in allowed_user_ids_str.split(',') if uid.strip()]
-
     telegram_config = {
         'token': os.environ['TELEGRAM_BOT_TOKEN'],
         'admin_user_ids': admin_user_ids,  # ✅ правильный список чисел
-        'allowed_user_ids': allowed_user_ids,
         'enable_quoting': os.environ.get('ENABLE_QUOTING', 'true').lower() == 'true',
         'enable_image_generation': os.environ.get('ENABLE_IMAGE_GENERATION', 'true').lower() == 'true',
         'enable_transcription': os.environ.get('ENABLE_TRANSCRIPTION', 'true').lower() == 'true',

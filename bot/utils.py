@@ -11,8 +11,11 @@ import telegram
 from telegram import Message, MessageEntity, Update, ChatMember, constants
 from telegram.ext import CallbackContext, ContextTypes
 
+from database import Database
+
 from usage_tracker import UsageTracker
 
+load_dotenv()
 
 def message_text(message: Message) -> str:
     """
@@ -184,35 +187,32 @@ def is_admin(config, user_id: int, log_no_admin=False) -> bool:
     return False
 
 
-def get_user_budget(config, user_id) -> float | None:
+def get_user_budget(user_id: int, config: dict) -> float:
     """
-    Get the user's budget based on their user ID and the bot configuration.
-    :param config: The bot configuration object
-    :param user_id: User id
-    :return: The user's budget as a float, or None if the user is not found in the allowed user list
+    Возвращает лимит бюджета для пользователя.
+    Если пользователь одобрен, ищем индивидуальный лимит, если задан.
+    В противном случае — возвращаем гостевой лимит.
     """
+    db = Database()
+    approved_users = [user['user_id'] for user in db.get_users() if user.get('status') == 'approved']
 
-    # no budget restrictions for admins and '*'-budget lists
-    if is_admin(config, user_id) or config['user_budgets'] == '*':
-        return float('inf')
+    # Преобразуем user_budgets из строки формата "12345:200.0,67890:150.0"
+    raw_budgets = config.get('user_budgets', '*')
+    user_budgets = {}
 
-    user_budgets = config['user_budgets'].split(',')
-    if config['allowed_user_ids'] == '*':
-        # same budget for all users, use value in first position of budget list
-        if len(user_budgets) > 1:
-            logging.warning('multiple values for budgets set with unrestricted user list '
-                            'only the first value is used as budget for everyone.')
-        return float(user_budgets[0])
+    if raw_budgets != '*':
+        for item in raw_budgets.split(','):
+            if ':' in item:
+                uid_str, value = item.split(':')
+                try:
+                    user_budgets[int(uid_str)] = float(value)
+                except ValueError:
+                    logging.warning(f"Некорректный формат user_budgets: {item}")
 
-    allowed_user_ids = config['allowed_user_ids'].split(',')
-    if str(user_id) in allowed_user_ids:
-        user_index = allowed_user_ids.index(str(user_id))
-        if len(user_budgets) <= user_index:
-            logging.warning(f'No budget set for user id: {user_id}. Budget list shorter than user list.')
-            return 0.0
-        return float(user_budgets[user_index])
-    return None
-
+    if user_id in approved_users:
+        return user_budgets.get(user_id, float('inf'))  # Безлимитный доступ, если не задан индивидуально
+    else:
+        return config.get('guest_budget', 100.0)
 
 def get_remaining_budget(config, usage, update: Update, is_inline=False) -> float:
     """
