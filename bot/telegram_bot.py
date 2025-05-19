@@ -1364,7 +1364,6 @@ class ChatGPTTelegramBot:
 
         # Обработчик inline callback запросов
         application.add_handler(CallbackQueryHandler(self.handle_callback_inline_query))
-
         application.run_polling()
 
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
