@@ -149,33 +149,21 @@ async def error_handler(_: object, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def is_allowed(config, update: Update, context: CallbackContext, is_inline=False) -> bool:
-    """
-    Checks if the user is allowed to use the bot.
-    """
-    if config['allowed_user_ids'] == '*':
+    if config['admin_user_ids'] == '*':
         return True
 
     user_id = update.inline_query.from_user.id if is_inline else update.message.from_user.id
     if is_admin(config, user_id):
         return True
-    name = update.inline_query.from_user.name if is_inline else update.message.from_user.name
-    allowed_user_ids = config['allowed_user_ids']  # уже список
-    # Check if user is allowed
-    if str(user_id) in allowed_user_ids:
-        return True
-    # Check if it's a group a chat with at least one authorized member
-    if not is_inline and is_group_chat(update):
-        admin_user_ids = config['admin_user_ids'].split(',')
-        for user in itertools.chain(allowed_user_ids, admin_user_ids):
-            if not user.strip():
-                continue
-            if await is_user_in_group(update, context, user):
-                logging.info(f'{user} is a member. Allowing group chat message...')
-                return True
-        logging.info(f'Group chat messages from user {name} '
-                     f'(id: {user_id}) are not allowed')
-    return False
 
+    db = Database()
+    if db.is_approved(user_id):
+        return True
+
+    # Можно логировать отказ
+    name = update.inline_query.from_user.name if is_inline else update.message.from_user.name
+    logging.warning(f'User {name} (id: {user_id}) is not allowed to use the bot.')
+    return False
 
 def is_admin(config, user_id: int, log_no_admin=False) -> bool:
     """
