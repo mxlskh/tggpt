@@ -33,9 +33,8 @@ class Database:
         return self.load_json("blocked_users.json")
 
     def add_join_request(self, user_id: int, username: str):
-        requests = self.load_json("join_requests.json")
+        requests = self.get_requests()
         user_id_str = str(user_id)
-
         if user_id_str not in requests:
             requests[user_id_str] = {
                 "username": username,
@@ -44,47 +43,48 @@ class Database:
             self.save_json("join_requests.json", requests)
 
 
+
     async def approve_request(self, user_id, bot):
         requests = self.get_requests()
         users = self.get_users()
-        user_id = str(user_id)
+        user_id_str = str(user_id)
 
-        if user_id in requests:
-            users[user_id] = {
-                "username": requests[user_id].get("username") or requests[user_id].get("name"),
+        if user_id_str in requests:
+            request_info = requests[user_id_str]
+            username = request_info.get("username") or request_info.get("name") or "Без имени"
+
+            users[user_id_str] = {
+                "username": username,
                 "status": "approved",
                 "joined": str(datetime.now().date())
             }
-            del requests[user_id]
+            del requests[user_id_str]
             self.save_json("users.json", users)
             self.save_json("join_requests.json", requests)
 
-        # Уведомляем пользователя
-        try:
-            await bot.send_message(
-                chat_id=int(user_id),
-                text="✅ Ваша заявка одобрена! Теперь вы можете пользоваться ботом."
-            )
-        except Exception as e:
-            logging.warning(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
+            try:
+                await bot.send_message(
+                    chat_id=int(user_id),
+                    text="✅ Ваша заявка одобрена! Теперь вы можете использовать функционал бота."
+                )
+            except Exception as e:
+                print(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
+
 
     def reject_request(self, user_id):
         requests = self.get_requests()
-        user_id = str(user_id)
-        if user_id in requests:
-            del requests[user_id]
+        blocked = self.get_blocked_users()
+        user_id_str = str(user_id)
+        user_id_int = int(user_id)
+
+        if user_id_str in requests:
+            del requests[user_id_str]
             self.save_json("join_requests.json", requests)
 
-    def block_user(self, user_id):
-        blocked = self.get_blocked_users()
-        user_id = int(user_id)
-        if user_id not in blocked:
-            blocked.append(user_id)
+        if user_id_int not in blocked:
+            blocked.append(user_id_int)
             self.save_json("blocked_users.json", blocked)
 
-        users = self.get_users()
-        users.pop(str(user_id), None)
-        self.save_json("users.json", users)
 
     def unblock_user(self, user_id):
         blocked = self.get_blocked_users()
@@ -131,4 +131,5 @@ class Database:
     def is_approved(self, user_id: int) -> bool:
         users = self.get_users()
         user = users.get(str(user_id))
-        return user is not None and user.get("status") != "pending"
+        return user is not None and user.get("status") == "approved"
+
