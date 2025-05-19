@@ -472,13 +472,13 @@ class ChatGPTTelegramBot:
 
     async def tts(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
-        Generates an speech for the given input using TTS APIs
+        Generates speech for the given input using TTS APIs.
         """
         if not await self.check_access(update):
             await self.send_disallowed_message(update, context)
             return
-        if not self.config['enable_tts_generation'] \
-                or not await self.check_allowed_and_within_budget(update, context):
+
+        if not self.config['enable_tts_generation'] or not await self.check_allowed_and_within_budget(update, context):
             return
 
         tts_query = message_text(update.message)
@@ -490,7 +490,7 @@ class ChatGPTTelegramBot:
             return
 
         logging.info(f'New speech generation request received from user {update.message.from_user.name} '
-                     f'(id: {update.message.from_user.id})')
+                    f'(id: {update.message.from_user.id})')
 
         async def _generate():
             try:
@@ -501,15 +501,22 @@ class ChatGPTTelegramBot:
                     voice=speech_file
                 )
                 speech_file.close()
-                # add image request to users usage tracker
+
                 user_id = update.message.from_user.id
-                self.usage[user_id].add_tts_request(text_length, self.config['tts_model'], self.config['tts_prices'])
-                # add guest chat request to guest usage tracker
-                if str(user_id) not in self.config['allowed_user_ids'] and 'guests' in self.usage:
+
+                self.usage[user_id].add_tts_request(
+                    text_length, self.config['tts_model'], self.config['tts_prices']
+                )
+
+                # Проверка, что user_id не в списке разрешённых
+                allowed_ids = self.config.get("allowed_user_ids", [])
+                if isinstance(allowed_ids, str):
+                    allowed_ids = [x.strip() for x in allowed_ids.split(",") if x.strip()]
+
+                if str(user_id) not in allowed_ids and "guests" in self.usage:
                     self.usage["guests"].add_tts_request(
                         text_length, self.config['tts_model'], self.config['tts_prices']
                     )
-
 
             except Exception as e:
                 logging.exception(e)
@@ -521,6 +528,7 @@ class ChatGPTTelegramBot:
                 )
 
         await wrap_with_indicator(update, context, _generate, constants.ChatAction.UPLOAD_VOICE)
+
 
     async def transcribe(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
