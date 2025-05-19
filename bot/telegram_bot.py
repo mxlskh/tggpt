@@ -506,7 +506,10 @@ class ChatGPTTelegramBot:
                 self.usage[user_id].add_tts_request(text_length, self.config['tts_model'], self.config['tts_prices'])
                 # add guest chat request to guest usage tracker
                 if str(user_id) not in self.config['allowed_user_ids'] and 'guests' in self.usage:
-                    self.usage["guests"].add_tts_request(text_length, self.config['tts_model'], self.config['tts_prices'])
+                    self.usage["guests"].add_tts_request(
+                        text_length, self.config['tts_model'], self.config['tts_prices']
+                    )
+
 
             except Exception as e:
                 logging.exception(e)
