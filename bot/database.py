@@ -33,13 +33,16 @@ class Database:
         return self.load_json("blocked_users.json")
 
     def add_join_request(self, user_id: int, username: str):
-        users = self.load_json("users.json")
-        if str(user_id) not in users:
-            users[str(user_id)] = {
+        requests = self.load_json("join_requests.json")
+        user_id_str = str(user_id)
+
+        if user_id_str not in requests:
+            requests[user_id_str] = {
                 "username": username,
                 "status": "pending"
             }
-            self.save_json("users.json", users)
+            self.save_json("join_requests.json", requests)
+
 
     async def approve_request(self, user_id, bot):
         requests = self.get_requests()
