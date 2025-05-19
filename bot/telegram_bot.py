@@ -22,7 +22,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, \
 from pydub import AudioSegment
 from PIL import Image
 
-from utils import is_group_chat, get_thread_id, message_text, wrap_with_indicator, split_into_chunks, \
+from utils import is_group_chat, get_thread_id, message_text, wrap_with_indicator, \
     edit_message_with_retry, get_stream_cutoff_values, is_allowed, get_remaining_budget, is_admin, is_within_budget, \
     get_reply_to_message_id, add_chat_request_to_usage_tracker, error_handler, is_direct_result, handle_direct_result, \
     cleanup_intermediate_files
