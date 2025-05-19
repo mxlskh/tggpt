@@ -1318,7 +1318,7 @@ class ChatGPTTelegramBot:
         await application.bot.set_my_commands(self.group_commands, scope=BotCommandScopeAllGroupChats())
         await application.bot.set_my_commands(self.commands)
 
-    async def run(self):
+    def run(self):
         """
         Runs the bot indefinitely until the user presses Ctrl+C
         """
@@ -1365,7 +1365,7 @@ class ChatGPTTelegramBot:
         # Обработчик inline callback запросов
         application.add_handler(CallbackQueryHandler(self.handle_callback_inline_query))
 
-        await application.run_polling()
+        application.run_polling()
 
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         """
