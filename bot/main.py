@@ -5,11 +5,15 @@ from dotenv import load_dotenv
 from plugin_manager import PluginManager
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
 from telegram_bot import ChatGPTTelegramBot
+from supabase_client import SupabaseClient
 
 def main():
     # Load environment variables
+    
     load_dotenv()
-
+    db = SupabaseClient()
+    
+    print("SupabaseClient импортирован успешно")
     # Setup logging
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
