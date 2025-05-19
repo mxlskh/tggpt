@@ -38,7 +38,7 @@ from supabase_client import SupabaseClient
 class ChatGPTTelegramBot:
     def __init__(self, config):
         self.config = config
-        self.db = SupabaseClient(config["SUPABASE_URL"], config["SUPABASE_KEY"])
+        self.db = SupabaseClient()
 
     async def check_access(self, update: Update) -> bool:
         user_id = update.effective_user.id
