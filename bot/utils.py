@@ -15,8 +15,6 @@ from database import Database
 
 from usage_tracker import UsageTracker
 
-load_dotenv()
-
 def message_text(message: Message) -> str:
     """
     Returns the text of a message, excluding any bot commands.
