@@ -59,7 +59,7 @@ def main():
         'vision_detail': os.environ.get('VISION_DETAIL', 'auto'),
         'vision_max_tokens': int(os.environ.get('VISION_MAX_TOKENS', '300')),
         'tts_model': os.environ.get('TTS_MODEL', 'tts-1-hd'),
-        'tts_voice': os.environ.get('TTS_VOICE', 'alloy'),
+        'tts_voice': os.environ.get('TTS_VOICE', 'sol'),
     }
 
     if openai_config['enable_functions'] and not functions_available:
