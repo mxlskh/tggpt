@@ -11,7 +11,7 @@ import telegram
 from telegram import Message, MessageEntity, Update, ChatMember, constants
 from telegram.ext import CallbackContext, ContextTypes
 
-from database import Database
+from supabase import create_client, Client
 
 from usage_tracker import UsageTracker
 
@@ -157,7 +157,7 @@ async def is_allowed(config, update: Update, context: CallbackContext, is_inline
     if is_admin(config, user_id):
         return True
 
-    db = Database()
+    db = SupabaseClient()
     if db.is_approved(user_id):
         return True
 
@@ -186,15 +186,9 @@ def is_admin(config, user_id: int, log_no_admin=False) -> bool:
 
 
 def get_user_budget(user_id: int, config: dict) -> float:
-    """
-    Возвращает лимит бюджета для пользователя.
-    Если пользователь одобрен, ищем индивидуальный лимит, если задан.
-    В противном случае — возвращаем гостевой лимит.
-    """
-    db = Database()
+    db = SupabaseClient()
     approved_users = [user['user_id'] for user in db.get_users() if user.get('status') == 'approved']
 
-    # Преобразуем user_budgets из строки формата "12345:200.0,67890:150.0"
     raw_budgets = config.get('user_budgets', '*')
     user_budgets = {}
 
@@ -208,7 +202,7 @@ def get_user_budget(user_id: int, config: dict) -> float:
                     logging.warning(f"Некорректный формат user_budgets: {item}")
 
     if user_id in approved_users:
-        return user_budgets.get(user_id, float('inf'))  # Безлимитный доступ, если не задан индивидуально
+        return user_budgets.get(user_id, float('inf'))
     else:
         return config.get('guest_budget', 100.0)
 

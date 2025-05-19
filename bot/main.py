@@ -1,15 +1,13 @@
 import logging
 import os
-
 from dotenv import load_dotenv
 
 from plugin_manager import PluginManager
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
 from telegram_bot import ChatGPTTelegramBot
 
-
 def main():
-    # Read .env file
+    # Load environment variables
     load_dotenv()
 
     # Setup logging
@@ -19,22 +17,23 @@ def main():
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
-    # Check if the required environment variables are set
+    # Check required env vars
     required_values = ['TELEGRAM_BOT_TOKEN', 'OPENAI_API_KEY']
     missing_values = [value for value in required_values if os.environ.get(value) is None]
-    if len(missing_values) > 0:
-        logging.error(f'The following environment values are missing in your .env: {", ".join(missing_values)}')
+    if missing_values:
+        logging.error(f'Missing env values: {", ".join(missing_values)}')
         exit(1)
 
-    # Setup configurations
+    # Setup OpenAI config
     model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
     functions_available = are_functions_available(model=model)
     max_tokens_default = default_max_tokens(model=model)
+    
     openai_config = {
         'api_key': os.environ['OPENAI_API_KEY'],
         'show_usage': os.environ.get('SHOW_USAGE', 'false').lower() == 'true',
         'stream': os.environ.get('STREAM', 'true').lower() == 'true',
-        'proxy': os.environ.get('PROXY', None) or os.environ.get('OPENAI_PROXY', None),
+        'proxy': os.environ.get('PROXY') or os.environ.get('OPENAI_PROXY'),
         'max_history_size': int(os.environ.get('MAX_HISTORY_SIZE', 15)),
         'max_conversation_age_minutes': int(os.environ.get('MAX_CONVERSATION_AGE_MINUTES', 180)),
         'assistant_prompt': os.environ.get('ASSISTANT_PROMPT', 'You are a helpful assistant.'),
@@ -63,33 +62,27 @@ def main():
     }
 
     if openai_config['enable_functions'] and not functions_available:
-        logging.error(f'ENABLE_FUNCTIONS is set to true, but the model {model} does not support it. '
-                        'Please set ENABLE_FUNCTIONS to false or use a model that supports it.')
+        logging.error(f'ENABLE_FUNCTIONS is true, but model {model} does not support functions.')
         exit(1)
-    if os.environ.get('MONTHLY_USER_BUDGETS') is not None:
-        logging.warning('The environment variable MONTHLY_USER_BUDGETS is deprecated. '
-                        'Please use USER_BUDGETS with BUDGET_PERIOD instead.')
-    if os.environ.get('MONTHLY_GUEST_BUDGET') is not None:
-        logging.warning('The environment variable MONTHLY_GUEST_BUDGET is deprecated. '
-                        'Please use GUEST_BUDGET with BUDGET_PERIOD instead.')
 
-    admin_ids_str = os.environ.get('ADMIN_USER_IDS', '')
-    admin_user_ids = [int(uid.strip()) for uid in admin_ids_str.split(',') if uid.strip().isdigit()]
-    logging.info(f"[CONFIG] Loaded admin IDs: {admin_user_ids}")
+    # Get admin IDs from environment (.env)
+    admin_ids_env = os.environ.get("ADMIN_USER_IDS", "")
+    admin_user_ids = [int(uid.strip()) for uid in admin_ids_env.split(",") if uid.strip().isdigit()]
+    logging.info(f"[CONFIG] Loaded admin IDs from .env: {admin_user_ids}")
 
     telegram_config = {
         'token': os.environ['TELEGRAM_BOT_TOKEN'],
-        'admin_user_ids': admin_user_ids,  # ✅ правильный список чисел
+        'admin_user_ids': admin_user_ids,
         'enable_quoting': os.environ.get('ENABLE_QUOTING', 'true').lower() == 'true',
         'enable_image_generation': os.environ.get('ENABLE_IMAGE_GENERATION', 'true').lower() == 'true',
         'enable_transcription': os.environ.get('ENABLE_TRANSCRIPTION', 'true').lower() == 'true',
         'enable_vision': os.environ.get('ENABLE_VISION', 'true').lower() == 'true',
         'enable_tts_generation': os.environ.get('ENABLE_TTS_GENERATION', 'true').lower() == 'true',
         'budget_period': os.environ.get('BUDGET_PERIOD', 'monthly').lower(),
-        'user_budgets': os.environ.get('USER_BUDGETS', os.environ.get('MONTHLY_USER_BUDGETS', '*')),
-        'guest_budget': float(os.environ.get('GUEST_BUDGET', os.environ.get('MONTHLY_GUEST_BUDGET', '100.0'))),
+        'user_budgets': os.environ.get('USER_BUDGETS', '*'),
+        'guest_budget': float(os.environ.get('GUEST_BUDGET', '100.0')),
         'stream': os.environ.get('STREAM', 'true').lower() == 'true',
-        'proxy': os.environ.get('PROXY', None) or os.environ.get('TELEGRAM_PROXY', None),
+        'proxy': os.environ.get('PROXY') or os.environ.get('TELEGRAM_PROXY'),
         'voice_reply_transcript': os.environ.get('VOICE_REPLY_WITH_TRANSCRIPT_ONLY', 'false').lower() == 'true',
         'voice_reply_prompts': os.environ.get('VOICE_REPLY_PROMPTS', '').split(';'),
         'ignore_group_transcriptions': os.environ.get('IGNORE_GROUP_TRANSCRIPTIONS', 'true').lower() == 'true',
@@ -106,10 +99,9 @@ def main():
     }
 
     plugin_config = {
-        'plugins': os.environ.get('PLUGINS', 'ddg_image_search').split(',')
+        'plugins': os.environ.get('PLUGINS', 'ddg_image_search').split(','),
     }
 
-    # Setup and run ChatGPT and Telegram bot
     plugin_manager = PluginManager(config=plugin_config)
     openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager)
     telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
