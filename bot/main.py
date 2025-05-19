@@ -1,15 +1,15 @@
 import logging
 import os
+
 from dotenv import load_dotenv
 
-from database import Database
 from plugin_manager import PluginManager
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
 from telegram_bot import ChatGPTTelegramBot
 
 
 def main():
-    # Load .env
+    # Read .env file
     load_dotenv()
 
     # Setup logging
@@ -19,81 +19,101 @@ def main():
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
+    # Check if the required environment variables are set
     required_values = ['TELEGRAM_BOT_TOKEN', 'OPENAI_API_KEY']
-    missing_values = [val for val in required_values if not os.environ.get(val)]
-    if missing_values:
-        logging.error(f'Missing .env variables: {", ".join(missing_values)}')
+    missing_values = [value for value in required_values if os.environ.get(value) is None]
+    if len(missing_values) > 0:
+        logging.error(f'The following environment values are missing in your .env: {", ".join(missing_values)}')
         exit(1)
 
-    model = os.getenv('OPENAI_MODEL', 'gpt-4o')
+    # Setup configurations
+    model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
     functions_available = are_functions_available(model=model)
-    max_tokens_default = default_max_tokens(model)
+    max_tokens_default = default_max_tokens(model=model)
+    openai_config = {
+        'api_key': os.environ['OPENAI_API_KEY'],
+        'show_usage': os.environ.get('SHOW_USAGE', 'false').lower() == 'true',
+        'stream': os.environ.get('STREAM', 'true').lower() == 'true',
+        'proxy': os.environ.get('PROXY', None) or os.environ.get('OPENAI_PROXY', None),
+        'max_history_size': int(os.environ.get('MAX_HISTORY_SIZE', 15)),
+        'max_conversation_age_minutes': int(os.environ.get('MAX_CONVERSATION_AGE_MINUTES', 180)),
+        'assistant_prompt': os.environ.get('ASSISTANT_PROMPT', 'You are a helpful assistant.'),
+        'max_tokens': int(os.environ.get('MAX_TOKENS', max_tokens_default)),
+        'n_choices': int(os.environ.get('N_CHOICES', 1)),
+        'temperature': float(os.environ.get('TEMPERATURE', 1.0)),
+        'image_model': os.environ.get('IMAGE_MODEL', 'dall-e-3'),
+        'image_quality': os.environ.get('IMAGE_QUALITY', 'HD'),
+        'image_style': os.environ.get('IMAGE_STYLE', 'natural'),
+        'image_size': os.environ.get('IMAGE_SIZE', '1024x1024'),
+        'model': model,
+        'enable_functions': os.environ.get('ENABLE_FUNCTIONS', str(functions_available)).lower() == 'true',
+        'functions_max_consecutive_calls': int(os.environ.get('FUNCTIONS_MAX_CONSECUTIVE_CALLS', 10)),
+        'presence_penalty': float(os.environ.get('PRESENCE_PENALTY', 0.0)),
+        'frequency_penalty': float(os.environ.get('FREQUENCY_PENALTY', 0.0)),
+        'bot_language': os.environ.get('BOT_LANGUAGE', 'ru'),
+        'show_plugins_used': os.environ.get('SHOW_PLUGINS_USED', 'false').lower() == 'true',
+        'whisper_prompt': os.environ.get('WHISPER_PROMPT', ''),
+        'vision_model': os.environ.get('VISION_MODEL', 'gpt-4o'),
+        'enable_vision_follow_up_questions': os.environ.get('ENABLE_VISION_FOLLOW_UP_QUESTIONS', 'true').lower() == 'true',
+        'vision_prompt': os.environ.get('VISION_PROMPT', 'What is in this image'),
+        'vision_detail': os.environ.get('VISION_DETAIL', 'auto'),
+        'vision_max_tokens': int(os.environ.get('VISION_MAX_TOKENS', '300')),
+        'tts_model': os.environ.get('TTS_MODEL', 'tts-1-hd'),
+        'tts_voice': os.environ.get('TTS_VOICE', 'alloy'),
+    }
 
-    admin_ids_str = os.getenv('ADMIN_USER_IDS', '')
+    if openai_config['enable_functions'] and not functions_available:
+        logging.error(f'ENABLE_FUNCTIONS is set to true, but the model {model} does not support it. '
+                        'Please set ENABLE_FUNCTIONS to false or use a model that supports it.')
+        exit(1)
+    if os.environ.get('MONTHLY_USER_BUDGETS') is not None:
+        logging.warning('The environment variable MONTHLY_USER_BUDGETS is deprecated. '
+                        'Please use USER_BUDGETS with BUDGET_PERIOD instead.')
+    if os.environ.get('MONTHLY_GUEST_BUDGET') is not None:
+        logging.warning('The environment variable MONTHLY_GUEST_BUDGET is deprecated. '
+                        'Please use GUEST_BUDGET with BUDGET_PERIOD instead.')
+
+    admin_ids_str = os.environ.get('ADMIN_USER_IDS', '')
     admin_user_ids = [int(uid.strip()) for uid in admin_ids_str.split(',') if uid.strip().isdigit()]
     logging.info(f"[CONFIG] Loaded admin IDs: {admin_user_ids}")
 
-    openai_config = {
-        'api_key': os.environ['OPENAI_API_KEY'],
-        'stream': os.getenv('STREAM', 'true').lower() == 'true',
-        'show_usage': os.getenv('SHOW_USAGE', 'false').lower() == 'true',
-        'proxy': os.getenv('OPENAI_PROXY') or os.getenv('PROXY'),
-        'max_history_size': int(os.getenv('MAX_HISTORY_SIZE', 15)),
-        'max_conversation_age_minutes': int(os.getenv('MAX_CONVERSATION_AGE_MINUTES', 180)),
-        'assistant_prompt': os.getenv('ASSISTANT_PROMPT', 'You are a helpful assistant.'),
-        'max_tokens': int(os.getenv('MAX_TOKENS', max_tokens_default)),
-        'temperature': float(os.getenv('TEMPERATURE', 1.0)),
-        'n_choices': int(os.getenv('N_CHOICES', 1)),
-        'enable_functions': os.getenv('ENABLE_FUNCTIONS', str(functions_available)).lower() == 'true',
-        'functions_max_consecutive_calls': int(os.getenv('FUNCTIONS_MAX_CONSECUTIVE_CALLS', 10)),
-        'presence_penalty': float(os.getenv('PRESENCE_PENALTY', 0.0)),
-        'frequency_penalty': float(os.getenv('FREQUENCY_PENALTY', 0.0)),
-        'model': model,
-        'image_model': os.getenv('IMAGE_MODEL', 'dall-e-3'),
-        'image_quality': os.getenv('IMAGE_QUALITY', 'HD'),
-        'image_style': os.getenv('IMAGE_STYLE', 'natural'),
-        'image_size': os.getenv('IMAGE_SIZE', '1024x1024'),
-        'vision_model': os.getenv('VISION_MODEL', 'gpt-4o'),
-        'enable_vision_follow_up_questions': os.getenv('ENABLE_VISION_FOLLOW_UP_QUESTIONS', 'true').lower() == 'true',
-        'vision_prompt': os.getenv('VISION_PROMPT', 'What is in this image'),
-        'vision_detail': os.getenv('VISION_DETAIL', 'auto'),
-        'vision_max_tokens': int(os.getenv('VISION_MAX_TOKENS', '300')),
-        'bot_language': os.getenv('BOT_LANGUAGE', 'ru'),
-        'tts_model': os.getenv('TTS_MODEL', 'tts-1'),
-        'tts_voice': os.getenv('TTS_VOICE', 'alloy'),
-        'tts_prices': [float(p) for p in os.getenv('TTS_PRICES', '0.015,0.030').split(',')],
-        'transcription_price': float(os.getenv('TRANSCRIPTION_PRICE', 0.006)),
-        'enable_image_generation': os.getenv('ENABLE_IMAGE_GENERATION', 'true').lower() == 'true',
-        'enable_transcription': os.getenv('ENABLE_TRANSCRIPTION', 'true').lower() == 'true',
-        'enable_vision': os.getenv('ENABLE_VISION', 'true').lower() == 'true',
-        'enable_tts_generation': os.getenv('ENABLE_TTS_GENERATION', 'true').lower() == 'true',
-        'bot_language': os.getenv('BOT_LANGUAGE', 'ru'),
-    }
+    allowed_user_ids_str = os.environ.get('ALLOWED_TELEGRAM_USER_IDS', '')
+    allowed_user_ids = [uid.strip() for uid in allowed_user_ids_str.split(',') if uid.strip()]
 
     telegram_config = {
         'token': os.environ['TELEGRAM_BOT_TOKEN'],
-        'admin_user_ids': admin_user_ids,
-        'proxy': os.getenv('TELEGRAM_PROXY', None),
-        'budget_period': os.getenv('BUDGET_PERIOD', 'monthly'),
-        'user_budgets': os.getenv('USER_BUDGETS', '*'),
-        'guest_budget': float(os.getenv('GUEST_BUDGET', '100.0')),
-        'enable_quoting': os.getenv('ENABLE_QUOTING', 'true').lower() == 'true',
-        'voice_reply_transcript': os.getenv('VOICE_REPLY_WITH_TRANSCRIPT_ONLY', 'false').lower() == 'true',
-        'voice_reply_prompts': os.getenv('VOICE_REPLY_PROMPTS', '').split(';'),
-        'ignore_group_transcriptions': os.getenv('IGNORE_GROUP_TRANSCRIPTIONS', 'true').lower() == 'true',
-        'ignore_group_vision': os.getenv('IGNORE_GROUP_VISION', 'true').lower() == 'true',
-        'group_trigger_keyword': os.getenv('GROUP_TRIGGER_KEYWORD', ''),
-        'token_price': float(os.getenv('TOKEN_PRICE', 0.002)),
-        'image_prices': [float(p) for p in os.getenv('IMAGE_PRICES', '0.016,0.018,0.02').split(',')],
-        'vision_token_price': float(os.getenv('VISION_TOKEN_PRICE', '0.01')),
-        'image_receive_mode': os.getenv('IMAGE_FORMAT', 'photo'),
-        'tts_prices': [float(p) for p in os.getenv('TTS_PRICES', '0.015,0.030').split(',')],
+        'admin_user_ids': admin_user_ids,  # ✅ правильный список чисел
+        'allowed_user_ids': allowed_user_ids,
+        'enable_quoting': os.environ.get('ENABLE_QUOTING', 'true').lower() == 'true',
+        'enable_image_generation': os.environ.get('ENABLE_IMAGE_GENERATION', 'true').lower() == 'true',
+        'enable_transcription': os.environ.get('ENABLE_TRANSCRIPTION', 'true').lower() == 'true',
+        'enable_vision': os.environ.get('ENABLE_VISION', 'true').lower() == 'true',
+        'enable_tts_generation': os.environ.get('ENABLE_TTS_GENERATION', 'true').lower() == 'true',
+        'budget_period': os.environ.get('BUDGET_PERIOD', 'monthly').lower(),
+        'user_budgets': os.environ.get('USER_BUDGETS', os.environ.get('MONTHLY_USER_BUDGETS', '*')),
+        'guest_budget': float(os.environ.get('GUEST_BUDGET', os.environ.get('MONTHLY_GUEST_BUDGET', '100.0'))),
+        'stream': os.environ.get('STREAM', 'true').lower() == 'true',
+        'proxy': os.environ.get('PROXY', None) or os.environ.get('TELEGRAM_PROXY', None),
+        'voice_reply_transcript': os.environ.get('VOICE_REPLY_WITH_TRANSCRIPT_ONLY', 'false').lower() == 'true',
+        'voice_reply_prompts': os.environ.get('VOICE_REPLY_PROMPTS', '').split(';'),
+        'ignore_group_transcriptions': os.environ.get('IGNORE_GROUP_TRANSCRIPTIONS', 'true').lower() == 'true',
+        'ignore_group_vision': os.environ.get('IGNORE_GROUP_VISION', 'true').lower() == 'true',
+        'group_trigger_keyword': os.environ.get('GROUP_TRIGGER_KEYWORD', ''),
+        'token_price': float(os.environ.get('TOKEN_PRICE', 0.002)),
+        'image_prices': [float(i) for i in os.environ.get('IMAGE_PRICES', "0.016,0.018,0.02").split(",")],
+        'vision_token_price': float(os.environ.get('VISION_TOKEN_PRICE', '0.01')),
+        'image_receive_mode': os.environ.get('IMAGE_FORMAT', "photo"),
+        'tts_model': os.environ.get('TTS_MODEL', 'tts-1'),
+        'tts_prices': [float(i) for i in os.environ.get('TTS_PRICES', "0.015,0.030").split(",")],
+        'transcription_price': float(os.environ.get('TRANSCRIPTION_PRICE', 0.006)),
+        'bot_language': os.environ.get('BOT_LANGUAGE', 'ru'),
     }
 
     plugin_config = {
-        'plugins': os.getenv('PLUGINS', 'ddg_image_search').split(','),
+        'plugins': os.environ.get('PLUGINS', 'ddg_image_search').split(',')
     }
 
+    # Setup and run ChatGPT and Telegram bot
     plugin_manager = PluginManager(config=plugin_config)
     openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager)
     telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
