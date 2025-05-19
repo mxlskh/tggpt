@@ -111,9 +111,7 @@ async def main():
     plugin_manager = PluginManager(config=plugin_config)
     openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager)
     telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
-
-    await telegram_bot.setup()
-
+    
     # Если run() — асинхронный, нужно await:
     if asyncio.iscoroutinefunction(telegram_bot.run):
         await telegram_bot.run()
