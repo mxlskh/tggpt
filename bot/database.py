@@ -48,9 +48,13 @@ class Database:
         requests = self.get_requests()
         users = self.get_users()
         user_id_str = str(user_id)
-
+    
+        print(f"[DEBUG] Current join requests: {requests}")
+    
         if user_id_str in requests:
             request_info = requests[user_id_str]
+            print(f"[DEBUG] Approving user info: {request_info}")
+
             username = request_info.get("username") or request_info.get("name") or "Без имени"
 
             users[user_id_str] = {
@@ -62,13 +66,10 @@ class Database:
             self.save_json("users.json", users)
             self.save_json("join_requests.json", requests)
 
-            try:
-                await bot.send_message(
-                    chat_id=int(user_id),
-                    text="✅ Ваша заявка одобрена! Теперь вы можете использовать функционал бота."
-                )
-            except Exception as e:
-                print(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
+            print(f"[DEBUG] Saved users.json content: {self.load_json('users.json')}")
+            print(f"[DEBUG] Saved join_requests.json content: {self.load_json('join_requests.json')}")
+            print(f"[DEBUG] Updated users.json: {users}")
+
 
 
     def reject_request(self, user_id):
