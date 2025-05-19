@@ -38,6 +38,7 @@ from supabase_client import SupabaseClient
 class ChatGPTTelegramBot:
     def __init__(self, config):
         self.config = config
+        self.openai = openai
         self.db = SupabaseClient()
 
     async def check_access(self, update: Update) -> bool:
@@ -1317,7 +1318,7 @@ class ChatGPTTelegramBot:
         await application.bot.set_my_commands(self.group_commands, scope=BotCommandScopeAllGroupChats())
         await application.bot.set_my_commands(self.commands)
 
-    def run(self):
+    async def run(self):
         """
         Runs the bot indefinitely until the user presses Ctrl+C
         """
@@ -1364,7 +1365,7 @@ class ChatGPTTelegramBot:
         # Обработчик inline callback запросов
         application.add_handler(CallbackQueryHandler(self.handle_callback_inline_query))
 
-        application.run_polling()
+        await application.run_polling()
 
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         """

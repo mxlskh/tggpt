@@ -1,5 +1,6 @@
 import logging
 import os
+import asyncio
 from dotenv import load_dotenv
 
 from plugin_manager import PluginManager
@@ -7,13 +8,14 @@ from openai_helper import OpenAIHelper, default_max_tokens, are_functions_availa
 from telegram_bot import ChatGPTTelegramBot
 from supabase_client import SupabaseClient
 
-def main():
+
+async def main():
     # Load environment variables
-    
     load_dotenv()
     db = SupabaseClient()
-    
+
     print("SupabaseClient импортирован успешно")
+
     # Setup logging
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -32,7 +34,7 @@ def main():
     model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
     functions_available = are_functions_available(model=model)
     max_tokens_default = default_max_tokens(model=model)
-    
+
     openai_config = {
         'api_key': os.environ['OPENAI_API_KEY'],
         'show_usage': os.environ.get('SHOW_USAGE', 'false').lower() == 'true',
@@ -109,8 +111,15 @@ def main():
     plugin_manager = PluginManager(config=plugin_config)
     openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager)
     telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
-    telegram_bot.run()
+
+    await telegram_bot.setup()
+
+    # Если run() — асинхронный, нужно await:
+    if asyncio.iscoroutinefunction(telegram_bot.run):
+        await telegram_bot.run()
+    else:
+        telegram_bot.run()
 
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
