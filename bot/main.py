@@ -75,9 +75,10 @@ def main():
 
     admin_ids_str = os.environ.get('ADMIN_USER_IDS', '')
     admin_user_ids = [int(uid.strip()) for uid in admin_ids_str.split(',') if uid.strip().isdigit()]
+    logging.info(f"[CONFIG] Loaded admin IDs: {admin_user_ids}")
+
     allowed_user_ids_str = os.environ.get('ALLOWED_TELEGRAM_USER_IDS', '')
     allowed_user_ids = [uid.strip() for uid in allowed_user_ids_str.split(',') if uid.strip()]
-    logging.info(f"[CONFIG] Loaded admin IDs: {admin_user_ids}")
 
     telegram_config = {
         'token': os.environ['TELEGRAM_BOT_TOKEN'],
