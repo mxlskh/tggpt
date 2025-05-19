@@ -1,0 +1,10 @@
+{
+  "123456": {
+    "username": "user1",
+    "status": "approved"
+  },
+  "234567": {
+    "username": "user2",
+    "status": "pending"
+  }
+}
