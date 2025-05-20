@@ -9,10 +9,11 @@ class SupabaseClient:
 
     def is_user_approved(self, user_id: int) -> bool:
         response = self.client.table("users").select("status").eq("id", str(user_id)).execute()
-        if response.status_code != 200:
+        if response.error:
             return False
         users = response.data
         return bool(users and users[0].get("status") == "approved")
+
 
     def get_approved_users(self):
         response = self.client.table("users").select("*").eq("status", "approved").execute()
