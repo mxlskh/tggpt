@@ -110,11 +110,11 @@ def main():
 
     plugin_manager = PluginManager(config=plugin_config)
     openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager)
-    telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
+    telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper, supabase=supabase_client)
     telegram_bot.run()
 
 
 if __name__ == '__main__':
     supabase_client = SupabaseClient()
-    bot = ChatGPTTelegramBot(TOKEN, supabase_client)
+    bot = ChatGPTTelegramBot(os.environ['TELEGRAM_BOT_TOKEN'], supabase_client)
     bot.run()

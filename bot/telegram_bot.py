@@ -36,9 +36,45 @@ from supabase_client import SupabaseClient
 
 
 class ChatGPTTelegramBot:
-    def __init__(self, token, supabase_client):
-        self.db = supabase_client
-        self.application = ApplicationBuilder().token(token).build()
+    def __init__(self, config: dict, openai: OpenAIHelper, supabase):
+        """
+        Initializes the bot with the given configuration, OpenAI helper, and Supabase client.
+        """
+        self.config = config
+        self.openai = openai
+        self.db = supabase  # теперь у тебя точно есть self.db
+        self.application = ApplicationBuilder().token(config['token']).build()
+
+        bot_language = self.config['bot_language']
+
+        self.commands = [
+            BotCommand(command='help', description=localized_text('help_description', bot_language)),
+            BotCommand(command='reset', description=localized_text('reset_description', bot_language)),
+            BotCommand(command='stats', description=localized_text('stats_description', bot_language)),
+            BotCommand(command='resend', description=localized_text('resend_description', bot_language))
+        ]
+
+        if self.config.get('enable_image_generation', False):
+            self.commands.append(BotCommand(command='image', description=localized_text('image_description', bot_language)))
+
+        if self.config.get('enable_tts_generation', False):
+            self.commands.append(BotCommand(command='tts', description=localized_text('tts_description', bot_language)))
+
+        self.group_commands = [BotCommand(
+            command='chat', description=localized_text('chat_description', bot_language)
+        )] + self.commands
+
+        self.disallowed_message = localized_text('disallowed', bot_language)
+        self.budget_limit_message = localized_text('budget_limit', bot_language)
+        self.usage = {}
+        self.last_message = {}
+        self.inline_queries_cache = {}
+
+        self.admin_user_ids = config.get("admin_user_ids", [])
+        self.allowed_user_ids = config.get("allowed_user_ids", [])
+        self.DATA_DIR = "data"
+        os.makedirs(self.DATA_DIR, exist_ok=True)
+
         self._setup_handlers()
 
     async def check_access(self, update: Update) -> bool:
@@ -110,47 +146,6 @@ class ChatGPTTelegramBot:
         except Exception as e:
             logging.error(f"❌ Ошибка: {e}")
             await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
-
-    def __init__(self, config: dict, openai: OpenAIHelper):
-        """
-        Initializes the bot with the given configuration and GPT bot object.
-        :param config: A dictionary containing the bot configuration
-        :param openai: OpenAIHelper object
-        """
-        self.config = config
-        self.openai = openai
-        self.supabase = SupabaseClient()  # 🔄 Заменили self.db на supabase
-        bot_language = self.config['bot_language']
-
-        self.commands = [
-            BotCommand(command='help', description=localized_text('help_description', bot_language)),
-            BotCommand(command='reset', description=localized_text('reset_description', bot_language)),
-            BotCommand(command='stats', description=localized_text('stats_description', bot_language)),
-            BotCommand(command='resend', description=localized_text('resend_description', bot_language))
-        ]
-
-        # Команды по фичам
-        if self.config.get('enable_image_generation', False):
-            self.commands.append(BotCommand(command='image', description=localized_text('image_description', bot_language)))
-
-        if self.config.get('enable_tts_generation', False):
-            self.commands.append(BotCommand(command='tts', description=localized_text('tts_description', bot_language)))
-
-        self.group_commands = [BotCommand(
-            command='chat', description=localized_text('chat_description', bot_language)
-        )] + self.commands
-
-        # Остальные переменные
-        self.disallowed_message = localized_text('disallowed', bot_language)
-        self.budget_limit_message = localized_text('budget_limit', bot_language)
-        self.usage = {}
-        self.last_message = {}
-        self.inline_queries_cache = {}
-
-        self.admin_user_ids = config.get("admin_user_ids", [])
-        self.allowed_user_ids = config.get("allowed_user_ids", [])  # Возможно, больше не нужен
-        self.DATA_DIR = "data"
-        os.makedirs(self.DATA_DIR, exist_ok=True)
 
     def get_users_list_text(self):
         response = self.client.table("users").select("*").execute()
