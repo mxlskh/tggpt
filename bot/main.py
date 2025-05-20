@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 from plugin_manager import PluginManager
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
-from telegram_bot import ChatGPTTelegramBot
 from supabase_client import SupabaseClient
+from telegram_bot import ChatGPTTelegramBot
 
 
 def main():
@@ -114,5 +114,7 @@ def main():
     telegram_bot.run()
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    supabase_client = SupabaseClient()
+    bot = ChatGPTTelegramBot(TOKEN, supabase_client)
+    bot.run()
