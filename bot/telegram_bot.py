@@ -36,11 +36,6 @@ from supabase_client import SupabaseClient
 
 
 class ChatGPTTelegramBot:
-    def __init__(self, config, openai_helper):
-        self.supabase = SupabaseClient()
-        self.config = config
-        self.openai_helper = openai_helper
-        self.db = SupabaseClient()
 
     async def check_access(self, update: Update) -> bool:
         user_id = update.effective_user.id
@@ -118,9 +113,12 @@ class ChatGPTTelegramBot:
         :param config: A dictionary containing the bot configuration
         :param openai: OpenAIHelper object
         """
+        self.supabase = SupabaseClient()
         self.config = config
         self.openai = openai
+        self.openai_helper = openai_helper
         self.supabase = supabase
+        self.db = SupabaseClient()
         bot_language = self.config['bot_language']
 
         self.commands = [
