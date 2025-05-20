@@ -8,66 +8,69 @@ class SupabaseClient:
         self.client: Client = create_client(url, key)
 
     def is_user_approved(self, user_id: int) -> bool:
-        response = self.client.table("users").select("status").eq("id", str(user_id)).execute()
-        if response.error:
+        try:
+            response = self.client.table("users").select("status").eq("id", str(user_id)).execute()
+            users = response.data
+            return bool(users and users[0].get("status") == "approved")
+        except Exception as e:
+            print(f"[ERROR] is_user_approved: {e}")
             return False
-        users = response.data
-        return bool(users and users[0].get("status") == "approved")
-
 
     def get_approved_users(self):
-        response = self.client.table("users").select("*").eq("status", "approved").execute()
-        if response.status_code != 200:
+        try:
+            response = self.client.table("users").select("*").eq("status", "approved").execute()
+            return response.data or []
+        except Exception as e:
+            print(f"[ERROR] get_approved_users: {e}")
             return []
-        return response.data
 
     def get_pending_requests(self):
-        response = self.client.table("join_requests").select("*").execute()
-        if response.status_code != 200:
+        try:
+            response = self.client.table("join_requests").select("*").execute()
+            return response.data or []
+        except Exception as e:
+            print(f"[ERROR] get_pending_requests: {e}")
             return []
-        return response.data
 
     def add_join_request(self, user_id: int, username: str):
-        response = self.client.table("join_requests").insert({
-            "user_id": user_id,
-            "username": username
-        }).execute()
-        if response.status_code != 201:  # 201 Created
-            # Здесь можно добавить логирование ошибки или raise
-            pass
+        try:
+            self.client.table("join_requests").insert({
+                "user_id": user_id,
+                "username": username
+            }).execute()
+        except Exception as e:
+            print(f"[ERROR] add_join_request: {e}")
 
     def approve_user(self, user_id: int, username: str):
-        # Добавляем пользователя в users
-        response_insert = self.client.table("users").insert({
-            "id": str(user_id),  # Обрати внимание — в users поле id, а не user_id
-            "username": username,
-            "status": "approved"
-        }).execute()
-        if response_insert.status_code != 201:
-            # обработать ошибку
-            pass
+        try:
+            # Добавляем пользователя в users
+            self.client.table("users").insert({
+                "id": str(user_id),  # поле называется id
+                "username": username,
+                "status": "approved"
+            }).execute()
 
-        # Удаляем из join_requests
-        response_delete = self.client.table("join_requests").delete().eq("user_id", user_id).execute()
-        if response_delete.status_code != 200:
-            # обработать ошибку
-            pass
+            # Удаляем заявку
+            self.client.table("join_requests").delete().eq("user_id", user_id).execute()
+        except Exception as e:
+            print(f"[ERROR] approve_user: {e}")
 
     def reject_user(self, user_id: int):
-        # Удаляем из join_requests
-        response_delete = self.client.table("join_requests").delete().eq("user_id", user_id).execute()
-        if response_delete.status_code != 200:
-            # обработать ошибку
-            pass
-        
-        # Добавляем в blocked_users
-        response_insert = self.client.table("blocked_users").insert({"user_id": user_id}).execute()
-        if response_insert.status_code != 201:
-            # обработать ошибку
-            pass
+        try:
+            # Удаляем заявку
+            self.client.table("join_requests").delete().eq("user_id", user_id).execute()
+
+            # Добавляем в блок
+            self.client.table("blocked_users").insert({
+                "user_id": user_id
+            }).execute()
+        except Exception as e:
+            print(f"[ERROR] reject_user: {e}")
 
     def is_blocked(self, user_id: int) -> bool:
-        response = self.client.table("blocked_users").select("*").eq("user_id", user_id).execute()
-        if response.status_code != 200:
+        try:
+            response = self.client.table("blocked_users").select("*").eq("user_id", user_id).execute()
+            return bool(response.data and len(response.data) > 0)
+        except Exception as e:
+            print(f"[ERROR] is_blocked: {e}")
             return False
-        return bool(response.data and len(response.data) > 0)
