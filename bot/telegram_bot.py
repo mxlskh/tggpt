@@ -116,7 +116,6 @@ class ChatGPTTelegramBot:
         self.supabase = SupabaseClient()
         self.config = config
         self.openai = openai
-        self.openai_helper = openai_helper
         self.supabase = supabase
         self.db = SupabaseClient()
         bot_language = self.config['bot_language']
