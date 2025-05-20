@@ -112,7 +112,7 @@ class ChatGPTTelegramBot:
             logging.error(f"❌ Ошибка: {e}")
             await update.message.reply_text("😔 Не удалось загрузить или отправить изображение.")
 
-    def __init__(self, config: dict, openai: OpenAIHelper):
+    def __init__(self, config: dict, openai: OpenAIHelper, supabase):
         """
         Initializes the bot with the given configuration and GPT bot object.
         :param config: A dictionary containing the bot configuration
@@ -120,7 +120,7 @@ class ChatGPTTelegramBot:
         """
         self.config = config
         self.openai = openai
-        self.supabase = SupabaseClient()  # 🔄 Заменили self.db на supabase
+        self.supabase = supabase
         bot_language = self.config['bot_language']
 
         self.commands = [
