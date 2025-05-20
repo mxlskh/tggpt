@@ -1373,7 +1373,7 @@ class ChatGPTTelegramBot:
         username = user.username or user.full_name
 
         # Асинхронно проверяем одобрение пользователя
-        if not await self.supabase.is_user_approved(user_id):
+        if not self.supabase.is_user_approved(user_id):
             # Асинхронно получаем заявки
             requests = await self.supabase.get_requests()
             if str(user_id) in requests:
