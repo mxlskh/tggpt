@@ -1375,8 +1375,8 @@ class ChatGPTTelegramBot:
         # Асинхронно проверяем одобрение пользователя
         if not self.supabase.is_user_approved(user_id):
             # Асинхронно получаем заявки
-            requests = await self.supabase.get_requests()
-            if str(user_id) in requests:
+            requests = self.supabase.get_requests()
+            if any(str(user_id) == str(req.get("user_id")) for req in requests):
                 await update.message.reply_text("Вы уже подали заявку. Ожидайте одобрения администратора.")
             else:
                 keyboard = InlineKeyboardMarkup([
