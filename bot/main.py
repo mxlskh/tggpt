@@ -1,19 +1,17 @@
 import logging
 import os
-import asyncio
 from dotenv import load_dotenv
+import asyncio
 
 from plugin_manager import PluginManager
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
-from supabase_client import SupabaseClient
 from telegram_bot import ChatGPTTelegramBot
-
+from supabase_client import SupabaseClient
 
 def main():
     # Load environment variables
     load_dotenv()
-    db = SupabaseClient()
-
+    supabase = SupabaseClient()
     print("SupabaseClient импортирован успешно")
 
     # Setup logging
@@ -110,11 +108,9 @@ def main():
 
     plugin_manager = PluginManager(config=plugin_config)
     openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager)
-    telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper, supabase=supabase_client)
+
+    telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper, supabase=supabase)
     telegram_bot.run()
 
-
 if __name__ == '__main__':
-    supabase_client = SupabaseClient()
-    bot = ChatGPTTelegramBot(os.environ['TELEGRAM_BOT_TOKEN'], supabase_client)
-    bot.run()
+    main()
