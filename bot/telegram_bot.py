@@ -1024,7 +1024,7 @@ class ChatGPTTelegramBot:
         username = user.username or user.full_name
 
         # Проверка одобрения пользователя через supabase
-        async def is_approved(user_id: int) -> bool:
+        async def is_user_approved(user_id: int) -> bool:
             resp = self.supabase.table('users').select('approved').eq('user_id', user_id).execute()
             if resp.status_code == 200 and resp.data:
                 return resp.data[0]['approved'] is True
@@ -1038,7 +1038,7 @@ class ChatGPTTelegramBot:
             return set()
 
         if callback_data == "start_dialog":
-            if is_approved(user_id):
+            if is_user_approved(user_id):
                 keyboard = [
                     [InlineKeyboardButton("Преподаватель", callback_data="role_teacher")],
                     [InlineKeyboardButton("Ученик", callback_data="role_student")]
@@ -1082,7 +1082,7 @@ class ChatGPTTelegramBot:
 
             return
 
-        if not is_approved(user_id):
+        if not is_user_approved(user_id):
             await update.callback_query.answer(
                 "⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.",
                 show_alert=True
@@ -1376,7 +1376,7 @@ class ChatGPTTelegramBot:
         username = user.username or user.full_name
 
         # Асинхронно проверяем одобрение пользователя
-        if not await self.supabase.is_approved(user_id):
+        if not await self.supabase.is_user_approved(user_id):
             # Асинхронно получаем заявки
             requests = await self.supabase.get_requests()
             if str(user_id) in requests:
