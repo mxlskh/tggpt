@@ -5,7 +5,7 @@ class SupabaseClient:
     def __init__(self):
         url = os.getenv("SUPABASE_URL")
         key = os.getenv("SUPABASE_KEY")
-        self.client: Client = create_client(url, key)
+        self.client = create_client(url, key)
 
     def is_user_approved(self, user_id: int) -> bool:
         try:

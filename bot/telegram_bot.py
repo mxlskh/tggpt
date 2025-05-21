@@ -1021,7 +1021,7 @@ class ChatGPTTelegramBot:
         username = user.username or user.full_name
 
         # Проверка одобрения пользователя через supabase
-        async def is_user_approved(user_id: int) -> bool:
+        def is_user_approved(user_id: int) -> bool:
             resp = self.supabase.table('users').select('approved').eq('user_id', user_id).execute()
             if resp.status_code == 200 and resp.data:
                 return resp.data[0]['approved'] is True
