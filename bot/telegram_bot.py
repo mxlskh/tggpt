@@ -1035,7 +1035,7 @@ class ChatGPTTelegramBot:
             return set()
 
         if callback_data == "start_dialog":
-            if await self.db.is_user_approved(user_id):
+            if is_user_approved(user_id):
                 keyboard = [
                     [InlineKeyboardButton("Преподаватель", callback_data="role_teacher")],
                     [InlineKeyboardButton("Ученик", callback_data="role_student")]
@@ -1373,9 +1373,9 @@ class ChatGPTTelegramBot:
         username = user.username or user.full_name
 
         # Асинхронно проверяем одобрение пользователя
-        if not self.supabase.is_user_approved(user_id):
+        if not await self.supabase.is_user_approved(user_id):
             # Асинхронно получаем заявки
-            requests = self.supabase.get_requests()
+            requests = await self.supabase.get_pending_requests()
             if any(str(user_id) == str(req.get("user_id")) for req in requests):
                 await update.message.reply_text("Вы уже подали заявку. Ожидайте одобрения администратора.")
             else:
