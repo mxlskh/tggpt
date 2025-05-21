@@ -1502,7 +1502,7 @@ class ChatGPTTelegramBot:
         user_id = update.effective_user.id
 
         # Проверка прав администратора (предположим, метод self.is_admin использует Supabase или локальный список)
-        if not await self.is_admin(user_id):  # Сделай is_admin асинхронным, если данные идут из Supabase
+        if not self.is_admin(user_id):  # Сделай is_admin асинхронным, если данные идут из Supabase
             await update.message.reply_text("❌ У вас нет доступа к этой команде.")
             return
 
