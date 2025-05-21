@@ -11,7 +11,7 @@ import telegram
 from telegram import Message, MessageEntity, Update, ChatMember, constants
 from telegram.ext import CallbackContext, ContextTypes
 
-from supabase import create_client, Client
+from supabase_client import SupabaseClient
 
 from usage_tracker import UsageTracker
 
