@@ -1045,9 +1045,10 @@ class ChatGPTTelegramBot:
                     "Выберите, кто вы:", reply_markup=InlineKeyboardMarkup(keyboard)
                 )
                 return
+                
+            pending = self.supabase.get_pending_requests()
 
                 # 2) Если заявка уже есть — предупреждаем
-                pending = self.supabase.get_pending_requests()
             if any(req.get("user_id") == user_id for req in pending):
                 await update.callback_query.answer(
                     "Вы уже подали заявку. Ожидайте одобрения администратора.",
