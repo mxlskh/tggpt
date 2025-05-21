@@ -158,7 +158,7 @@ async def is_allowed(config, update: Update, context: CallbackContext, is_inline
         return True
 
     db = SupabaseClient()
-    if db.is_approved(user_id):
+    if db.is_user_approved(user_id):
         return True
 
     # Можно логировать отказ

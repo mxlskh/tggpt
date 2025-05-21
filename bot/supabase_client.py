@@ -16,6 +16,13 @@ class SupabaseClient:
             print(f"[ERROR] is_user_approved: {e}")
             return False
 
+    def is_approved(self, user_id: int) -> bool:
+        """
+        Алиас для is_user_approved — чтобы is_allowed и другие проверки
+        могли вызывать один и тот же метод.
+        """
+        return self.is_user_approved(user_id)
+
     def is_blocked(self, user_id: int) -> bool:
         try:
             response = self.client.table("blocked_users").select("*").eq("user_id", user_id).execute()
@@ -86,7 +93,7 @@ class SupabaseClient:
             self.client.table("join_requests").delete().eq("user_id", user_id).execute()
         except Exception as e:
             print(f"[ERROR] approve_user: {e}")
-            
+
     def reject_user(self, user_id: int):
         try:
             self.client.table("join_requests").delete().eq("user_id", user_id).execute()
