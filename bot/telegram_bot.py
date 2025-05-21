@@ -1460,21 +1460,48 @@ class ChatGPTTelegramBot:
             return
 
         elif data.startswith("approve_request_"):
-            user_id = data.split("_")[-1]
+            # 1) Извлекаем ID и приводим к int
+            str_uid = data.split("_")[-1]
+            user_id = int(str_uid)
 
+            # 2) Берём username прямо из pending-заявок
+            requests = self.supabase.get_requests()  # { '12345': {'user_id':12345,'username':'ivan'} }
+            info = requests.get(str_uid, {})
+            username = info.get("username", "")
+
+            # 3) Переносим запись в users и удаляем из join_requests
             try:
-                self.supabase.approve_request(user_id)
-                self.supabase.send_approval_notification(user_id, context.bot)
-                await query.edit_message_text("✅ Заявка одобрена. Пользователь уведомлён.")
+                self.supabase.approve_user(user_id, username)  # качаем метод из supabase_client.py :contentReference[oaicite:1]{index=1}
+
+                # 4) Уведомляем пользователя о том, что его заявка одобрена
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="✅ Ваша заявка одобрена! Теперь вы можете пользоваться ботом."
+                )
+
+                # 5) Обновляем сообщение админа
+                await query.edit_message_text("✅ Заявка одобрена и пользователь уведомлён.")
             except Exception as e:
                 logging.error(f"Ошибка при одобрении заявки: {e}")
-                await query.answer("Ошибка при одобрении заявки", show_alert=True)
+                await query.answer("❗️Не удалось одобрить заявку. Посмотрите логи.", show_alert=True)
             return
 
         elif data.startswith("reject_request_"):
-            user_id = data.split("_")[-1]
-            self.supabase.reject_request(user_id)
-            await query.edit_message_text("Заявка отклонена.")
+            str_uid = data.split("_")[-1]
+            user_id = int(str_uid)
+
+            # Удаляем из запросов и (по желанию) вносим в заблокированные
+            try:
+                self.supabase.reject_user(user_id)
+                # уведомляем пользователя
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="❌ Ваша заявка отклонена."
+                )
+                await query.edit_message_text("❌ Заявка отклонена и пользователь уведомлён.")
+            except Exception as e:
+                logging.error(f"Ошибка при отклонении заявки: {e}")
+                await query.answer("❗️Не удалось отклонить заявку.", show_alert=True)
             return
 
         elif data == "admin_blocked_users":

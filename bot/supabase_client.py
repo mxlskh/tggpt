@@ -86,7 +86,7 @@ class SupabaseClient:
             self.client.table("join_requests").delete().eq("user_id", user_id).execute()
         except Exception as e:
             print(f"[ERROR] approve_user: {e}")
-
+            
     def reject_user(self, user_id: int):
         try:
             self.client.table("join_requests").delete().eq("user_id", user_id).execute()
