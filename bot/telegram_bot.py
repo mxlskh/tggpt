@@ -1035,48 +1035,51 @@ class ChatGPTTelegramBot:
             return set()
 
         if callback_data == "start_dialog":
-            if is_user_approved(user_id):
+              # 1) Если пользователь уже одобрен — сразу в меню ролей
+            if self.supabase.is_user_approved(user_id):
                 keyboard = [
                     [InlineKeyboardButton("Преподаватель", callback_data="role_teacher")],
-                    [InlineKeyboardButton("Ученик", callback_data="role_student")]
+                    [InlineKeyboardButton("Ученик",       callback_data="role_student")],
                 ]
                 await update.callback_query.edit_message_text(
                     "Выберите, кто вы:", reply_markup=InlineKeyboardMarkup(keyboard)
                 )
                 return
 
-            requests = get_requests()
-            if user_id in requests:
+                # 2) Если заявка уже есть — предупреждаем
+                pending = self.supabase.get_pending_requests()
+            if any(req.get("user_id") == user_id for req in pending):
                 await update.callback_query.answer(
-                    "Вы уже подали заявку. Ожидайте одобрения администратора.", show_alert=True
+                    "Вы уже подали заявку. Ожидайте одобрения администратора.",
+                    show_alert=True
                 )
                 return
 
-            # Добавляем заявку в supabase
-            insert_resp = self.supabase.table('join_requests').insert({
-                'user_id': user_id,
-                'username': username
-            }).execute()
-
-            if insert_resp.status_code == 201:
+                # 3) Добавляем новую заявку
+            try:
+                self.supabase.add_join_request(user_id, username)
                 await update.callback_query.answer(
-                    "Заявка отправлена. Ожидайте одобрения администратора.", show_alert=True
+                    "✅ Заявка отправлена. Ожидайте одобрения администратора.",
+                    show_alert=True
                 )
-            else:
+            except Exception as e:
+                logging.error(f"[ERROR] add_join_request: {e}")
                 await update.callback_query.answer(
-                    "Ошибка при отправке заявки. Попробуйте позже.", show_alert=True
+                    "❗️ Ошибка при отправке заявки. Попробуйте позже.",
+                    show_alert=True
                 )
                 return
 
+
+                # 4) Уведомляем всех админов о новой заявке
             for admin_id in self.config["admin_user_ids"]:
-                try:
-                    await context.bot.send_message(
-                        chat_id=admin_id,
-                        text=f"📨 Новая заявка от пользователя:\n\n👤 {username} (ID: {user_id})"
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=(
+                        f"📨 Новая заявка от пользователя:\n\n"
+                        f"👤 {username} (ID: {user_id})"
                     )
-                except Exception as e:
-                    print(f"❗ Ошибка при уведомлении админа {admin_id}: {e}")
-
+                )
             return
 
         if not is_user_approved(user_id):
