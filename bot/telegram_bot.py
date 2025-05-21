@@ -1254,7 +1254,7 @@ class ChatGPTTelegramBot:
 
         # Проверка одобрения пользователя через Supabase
         # Если твой клиент синхронный, тогда убери await и сделай sync запрос
-        resp = await self.supabase.table('users').select('approved').eq('user_id', user_id).execute()
+        resp = self.supabase.table('users').select('approved').eq('user_id', user_id).execute()
 
         if resp.status_code != 200 or not resp.data or not resp.data[0].get('approved', False):
             if is_inline:
@@ -1281,7 +1281,7 @@ class ChatGPTTelegramBot:
         user_id = user.id
 
         # Получаем данные пользователя из Supabase
-        resp = await self.supabase.table('users').select('approved').eq('user_id', user_id).execute()
+        resp = self.supabase.table('users').select('approved').eq('user_id', user_id).execute()
 
         approved = False
         if resp.status_code == 200 and resp.data:
@@ -1428,7 +1428,7 @@ class ChatGPTTelegramBot:
         await query.answer()
 
         if data == "admin_list_users":
-            users = await self.supabase.get_users()
+            users = self.supabase.get_users()
             text = "\n".join([f"{uid} — {user.get('username', 'Без имени')}" for uid, user in users.items()])
             if not text:
                 text = "Пользователей нет."
@@ -1436,7 +1436,7 @@ class ChatGPTTelegramBot:
             return
 
         elif data == "admin_view_requests":
-            requests = await self.supabase.get_requests()
+            requests = self.supabase.get_requests()
             if not requests:
                 await query.edit_message_text("Заявок нет.")
                 return
@@ -1459,8 +1459,8 @@ class ChatGPTTelegramBot:
             user_id = data.split("_")[-1]
 
             try:
-                await self.supabase.approve_request(user_id)
-                await self.supabase.send_approval_notification(user_id, context.bot)
+                self.supabase.approve_request(user_id)
+                self.supabase.send_approval_notification(user_id, context.bot)
                 await query.edit_message_text("✅ Заявка одобрена. Пользователь уведомлён.")
             except Exception as e:
                 logging.error(f"Ошибка при одобрении заявки: {e}")
@@ -1469,25 +1469,25 @@ class ChatGPTTelegramBot:
 
         elif data.startswith("reject_request_"):
             user_id = data.split("_")[-1]
-            await self.supabase.reject_request(user_id)
+            self.supabase.reject_request(user_id)
             await query.edit_message_text("Заявка отклонена.")
             return
 
         elif data == "admin_blocked_users":
-            blocked = await self.supabase.get_blocked_users()
+            blocked = self.supabase.get_blocked_users()
             text = "\n".join(map(str, blocked)) if blocked else "Заблокированных пользователей нет."
             await query.edit_message_text(text)
             return
 
         elif data.startswith("unblock_user_"):
             user_id = data.split("_")[-1]
-            await self.supabase.unblock_user(user_id)
+            self.supabase.unblock_user(user_id)
             await query.edit_message_text("Пользователь разблокирован.")
             return
 
         elif data.startswith("block_user_"):
             user_id = data.split("_")[-1]
-            await self.supabase.block_user(user_id)
+            self.supabase.block_user(user_id)
             await query.edit_message_text("Пользователь заблокирован.")
             return
 

@@ -9,7 +9,7 @@ class SupabaseClient:
 
     def is_user_approved(self, user_id: int) -> bool:
         try:
-            response = self.client.table("users").select("status").eq("id", str(user_id)).execute()
+            response = self.client.from_("users").select("status").eq("id", str(user_id)).execute()
             users = response.data
             return bool(users and users[0].get("status") == "approved")
         except Exception as e:
@@ -18,7 +18,7 @@ class SupabaseClient:
 
     def is_blocked(self, user_id: int) -> bool:
         try:
-            response = self.client.table("blocked_users").select("*").eq("user_id", user_id).execute()
+            response = self.client.from_("blocked_users").select("*").eq("user_id", user_id).execute()
             return bool(response.data)
         except Exception as e:
             print(f"[ERROR] is_blocked: {e}")
@@ -26,7 +26,7 @@ class SupabaseClient:
 
     def get_pending_requests(self):
         try:
-            response = self.client.table("join_requests").select("*").execute()
+            response = self.client.from_("join_requests").select("*").execute()
             return response.data or []
         except Exception as e:
             print(f"[ERROR] get_pending_requests: {e}")
@@ -34,7 +34,7 @@ class SupabaseClient:
 
     def add_join_request(self, user_id: int, username: str):
         try:
-            self.client.table("join_requests").insert({
+            self.client.from_("join_requests").insert({
                 "user_id": user_id,
                 "username": username
             }).execute()
@@ -43,19 +43,19 @@ class SupabaseClient:
 
     def approve_user(self, user_id: int, username: str):
         try:
-            self.client.table("users").upsert({
+            self.client.from_("users").upsert({
                 "id": str(user_id),
                 "username": username,
                 "status": "approved"
             }).execute()
-            self.client.table("join_requests").delete().eq("user_id", user_id).execute()
+            self.client.from_("join_requests").delete().eq("user_id", user_id).execute()
         except Exception as e:
             print(f"[ERROR] approve_user: {e}")
 
     def reject_user(self, user_id: int):
         try:
-            self.client.table("join_requests").delete().eq("user_id", user_id).execute()
-            self.client.table("blocked_users").insert({
+            self.client.from_("join_requests").delete().eq("user_id", user_id).execute()
+            self.client.from_("blocked_users").insert({
                 "user_id": user_id
             }).execute()
         except Exception as e:
