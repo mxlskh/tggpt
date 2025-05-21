@@ -16,13 +16,13 @@ class SupabaseClient:
             print(f"[ERROR] is_user_approved: {e}")
             return False
 
-    def get_approved_users(self):
+    def is_blocked(self, user_id: int) -> bool:
         try:
-            response = self.client.table("users").select("*").eq("status", "approved").execute()
-            return response.data or []
+            response = self.client.table("blocked_users").select("*").eq("user_id", user_id).execute()
+            return bool(response.data and len(response.data) > 0)
         except Exception as e:
-            print(f"[ERROR] get_approved_users: {e}")
-            return []
+            print(f"[ERROR] is_blocked: {e}")
+            return False
 
     def get_pending_requests(self):
         try:
@@ -31,6 +31,10 @@ class SupabaseClient:
         except Exception as e:
             print(f"[ERROR] get_pending_requests: {e}")
             return []
+
+    def get_requests(self):
+        # Просто псевдоним для совместимости
+        return self.get_pending_requests()
 
     def add_join_request(self, user_id: int, username: str):
         try:
@@ -43,34 +47,20 @@ class SupabaseClient:
 
     def approve_user(self, user_id: int, username: str):
         try:
-            # Добавляем пользователя в users
             self.client.table("users").insert({
-                "id": str(user_id),  # поле называется id
+                "id": str(user_id),
                 "username": username,
                 "status": "approved"
             }).execute()
-
-            # Удаляем заявку
             self.client.table("join_requests").delete().eq("user_id", user_id).execute()
         except Exception as e:
             print(f"[ERROR] approve_user: {e}")
 
     def reject_user(self, user_id: int):
         try:
-            # Удаляем заявку
             self.client.table("join_requests").delete().eq("user_id", user_id).execute()
-
-            # Добавляем в блок
             self.client.table("blocked_users").insert({
                 "user_id": user_id
             }).execute()
         except Exception as e:
             print(f"[ERROR] reject_user: {e}")
-
-    def is_blocked(self, user_id: int) -> bool:
-        try:
-            response = self.client.table("blocked_users").select("*").eq("user_id", user_id).execute()
-            return bool(response.data and len(response.data) > 0)
-        except Exception as e:
-            print(f"[ERROR] is_blocked: {e}")
-            return False
