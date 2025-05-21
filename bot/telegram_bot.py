@@ -1035,7 +1035,7 @@ class ChatGPTTelegramBot:
             return set()
 
         if callback_data == "start_dialog":
-            if is_user_approved(user_id):
+            if await self.db.is_user_approved(user_id):
                 keyboard = [
                     [InlineKeyboardButton("Преподаватель", callback_data="role_teacher")],
                     [InlineKeyboardButton("Ученик", callback_data="role_student")]
