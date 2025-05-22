@@ -39,15 +39,11 @@ class ChatGPTTelegramBot:
 
     async def check_access(self, update: Update) -> bool:
         user_id = update.effective_user.id
-        # Запрос к таблице пользователей Supabase
-        response = self.supabase.table("users").select("approved").eq("user_id", user_id).execute()
-        if response.error:
-            await update.message.reply_text("Ошибка проверки доступа, попробуйте позже.")
-            return False
-        
-        users = response.data
-        if not users or not users[0].get("approved", False):
-            await update.message.reply_text("⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.")
+        # используем готовый метод
+        if not self.supabase.is_user_approved(user_id):
+            await update.effective_message.reply_text(
+                "⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора."
+            )
             return False
         return True
 

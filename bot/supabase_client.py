@@ -6,6 +6,8 @@ class SupabaseClient:
         url = os.getenv("SUPABASE_URL")
         key = os.getenv("SUPABASE_KEY")
         self.client = create_client(url, key)
+        def table(self, table_name: str):
+            return self.client.table(table_name)
 
     def is_user_approved(self, user_id: int) -> bool:
         try:
