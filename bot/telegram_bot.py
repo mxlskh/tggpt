@@ -137,9 +137,11 @@ class ChatGPTTelegramBot:
         )] + self.commands
 
         # Описание новой админ-команды /all
-        self.commands.append(
-            BotCommand('all', 'Отправить сообщение всем одобренным пользователям')
-        )
+                # команды только для админов (Chat scope)
+        self.admin_commands = list(self.commands) + [
+            BotCommand('admin', 'Открыть админ-панель'),
+            BotCommand('all',   'Рассылка сообщения всем пользователям')
+        ]
 
         # Остальные переменные
         self.disallowed_message = localized_text('disallowed', bot_language)
@@ -1293,11 +1295,18 @@ class ChatGPTTelegramBot:
         return True
 
     async def post_init(self, application: Application) -> None:
-        """
-        Post initialization hook for the bot.
-        """
-        await application.bot.set_my_commands(self.group_commands, scope=BotCommandScopeAllGroupChats())
-        await application.bot.set_my_commands(self.commands)
+   
+        # 1) все прочие команды – всем чатам (Default scope)
+        await application.bot.set_my_commands(
+            self.commands,
+            scope=BotCommandScopeDefault()
+        )
+        # 2) команда /all – только в личных чатах админов
+        for admin_id in self.admin_user_ids:
+            await application.bot.set_my_commands(
+                self.admin_commands,
+                scope=BotCommandScopeChat(chat_id=admin_id)
+            )
 
     def run(self):
         """
