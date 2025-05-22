@@ -11,6 +11,8 @@ import requests
 
 from uuid import uuid4
 from io import BytesIO
+from telegram import Update
+from telegram.ext import ContextTypes
 from telegram import constants
 from telegram import BotCommandScopeAllGroupChats, Update, constants
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle
@@ -1338,7 +1340,7 @@ class ChatGPTTelegramBot:
         # Обработчик для админских кнопок по шаблону
         application.add_handler(CallbackQueryHandler(self.handle_admin_buttons, pattern="^(approve_request_|reject_request_|block_user_|unblock_user_)"))
 
-        application.add_handler(CommandHandler('all', self.broadcast))
+        application.add_handler(CommandHandler('all', self.broadcast, filters=filters.User(self.admin_user_ids)))
 
         # Обработчик ошибок
         application.add_error_handler(error_handler)
@@ -1517,31 +1519,31 @@ class ChatGPTTelegramBot:
         ]
         await update.message.reply_text("🛠 Админ-панель:", reply_markup=InlineKeyboardMarkup(keyboard))
 
-        async def broadcast(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-            # 1) Проверяем, что вызов сделал админ
-            user_id = update.effective_user.id
-            if not is_admin(self.config, user_id):
-                await update.message.reply_text("❌ У вас нет прав администратора.")
-                return
+    async def broadcast(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        # 1) Проверяем, что вызов сделал админ
+        user_id = update.effective_user.id
+        if not is_admin(self.config, user_id):
+            await update.message.reply_text("❌ У вас нет прав администратора.")
+            return
 
-            # 2) Проверяем, что после /all есть текст
-            if not context.args:
-                await update.message.reply_text("Использование: /all <текст сообщения>")
-                return
+        # 2) Проверяем, что после /all есть текст
+        if not context.args:
+            await update.message.reply_text("Использование: /all <текст сообщения>")
+            return
 
-            text = " ".join(context.args)
+        text = " ".join(context.args)
 
-            # 3) Получаем всех одобренных пользователей
-            users = self.supabase.get_users()  # возвращает { '12345': {...}, '67890': {...}, ... }
-            count = 0
-            for uid_str, record in users.items():
-                if record.get("status") != "approved":
-                    continue
-                try:
-                    await context.bot.send_message(chat_id=int(uid_str), text=text)
-                    count += 1
-                except Exception as e:
-                    logging.error(f"Ошибка при рассылке пользователю {uid_str}: {e}")
+        # 3) Получаем всех одобренных пользователей
+        users = self.supabase.get_users()  # возвращает { '12345': {...}, '67890': {...}, ... }
+        count = 0
+        for uid_str, record in users.items():
+            if record.get("status") != "approved":
+                continue
+            try:
+                await context.bot.send_message(chat_id=int(uid_str), text=text)
+                count += 1
+            except Exception as e:
+                logging.error(f"Ошибка при рассылке пользователю {uid_str}: {e}")
 
-            # 4) Отчёт в чат админа
-            await update.message.reply_text(f"✅ Рассылка выполнена: отправлено {count} сообщения(й).")
+        # 4) Отчёт в чат админа
+        await update.message.reply_text(f"✅ Рассылка выполнена: отправлено {count} сообщения(й).")
