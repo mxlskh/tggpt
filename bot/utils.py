@@ -233,7 +233,7 @@ def get_remaining_budget(config, usage, update: Update, is_inline=False) -> floa
         usage[user_id] = UsageTracker(user_id, name)
 
     # Get budget for users
-    user_budget = get_user_budget(config, user_id)
+    user_budget = get_user_budget(user_id, config)
     budget_period = config['budget_period']
     if user_budget is not None:
         cost = usage[user_id].get_current_cost()[budget_cost_map[budget_period]]
