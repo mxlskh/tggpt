@@ -134,6 +134,11 @@ class ChatGPTTelegramBot:
             command='chat', description=localized_text('chat_description', bot_language)
         )] + self.commands
 
+        # Описание новой админ-команды /all
+        self.commands.append(
+            BotCommand('all', 'Отправить сообщение всем одобренным пользователям')
+        )
+
         # Остальные переменные
         self.disallowed_message = localized_text('disallowed', bot_language)
         self.budget_limit_message = localized_text('budget_limit', bot_language)
@@ -1333,6 +1338,8 @@ class ChatGPTTelegramBot:
         # Обработчик для админских кнопок по шаблону
         application.add_handler(CallbackQueryHandler(self.handle_admin_buttons, pattern="^(approve_request_|reject_request_|block_user_|unblock_user_)"))
 
+        application.add_handler(CommandHandler('all', self.broadcast))
+
         # Обработчик ошибок
         application.add_error_handler(error_handler)
 
@@ -1509,3 +1516,32 @@ class ChatGPTTelegramBot:
             [InlineKeyboardButton("🚫 Заблокированные пользователи", callback_data="admin_blocked_users")],
         ]
         await update.message.reply_text("🛠 Админ-панель:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+        async def broadcast(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+            # 1) Проверяем, что вызов сделал админ
+            user_id = update.effective_user.id
+            if not is_admin(self.config, user_id):
+                await update.message.reply_text("❌ У вас нет прав администратора.")
+                return
+
+            # 2) Проверяем, что после /all есть текст
+            if not context.args:
+                await update.message.reply_text("Использование: /all <текст сообщения>")
+                return
+
+            text = " ".join(context.args)
+
+            # 3) Получаем всех одобренных пользователей
+            users = self.supabase.get_users()  # возвращает { '12345': {...}, '67890': {...}, ... }
+            count = 0
+            for uid_str, record in users.items():
+                if record.get("status") != "approved":
+                    continue
+                try:
+                    await context.bot.send_message(chat_id=int(uid_str), text=text)
+                    count += 1
+                except Exception as e:
+                    logging.error(f"Ошибка при рассылке пользователю {uid_str}: {e}")
+
+            # 4) Отчёт в чат админа
+            await update.message.reply_text(f"✅ Рассылка выполнена: отправлено {count} сообщения(й).")
