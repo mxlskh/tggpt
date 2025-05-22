@@ -1294,7 +1294,11 @@ class ChatGPTTelegramBot:
         user_id = user.id
 
         # Получаем данные пользователя из Supabase
-        resp = self.supabase.table('users').select('approved').eq('user_id', user_id).execute()
+        if not self.supabase.is_user_approved(user_id):
+            await update.message.reply_text(
+                "⛔️ Доступ запрещён. Подайте заявку и дождитесь одобрения администратора."
+            )
+            return
 
         approved = False
         if resp.status_code == 200 and resp.data:
