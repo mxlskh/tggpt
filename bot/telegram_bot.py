@@ -14,6 +14,7 @@ from io import BytesIO
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram import constants
+from telegram import BotCommandScopeDefault, BotCommandScopeChat, BotCommandScopeAllGroupChats, Update, constants
 from telegram import BotCommandScopeAllGroupChats, Update, constants
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle
 from telegram import InputTextMessageContent, BotCommand
@@ -1322,6 +1323,7 @@ class ChatGPTTelegramBot:
 
         # Добавляем обработчики команд
         application.add_handler(CommandHandler('admin', self.admin_panel))
+        application.add_handler(CommandHandler('all', self.broadcast, filters=filters.User(self.admin_user_ids)))
         application.add_handler(CallbackQueryHandler(self.handle_admin_buttons, pattern="^admin_"))
         application.add_handler(CommandHandler('reset', self.reset))
         application.add_handler(CommandHandler("image_search", self.image_search))
@@ -1348,8 +1350,6 @@ class ChatGPTTelegramBot:
         ]))
         # Обработчик для админских кнопок по шаблону
         application.add_handler(CallbackQueryHandler(self.handle_admin_buttons, pattern="^(approve_request_|reject_request_|block_user_|unblock_user_)"))
-
-        application.add_handler(CommandHandler('all', self.broadcast, filters=filters.User(self.admin_user_ids)))
 
         # Обработчик ошибок
         application.add_error_handler(error_handler)
