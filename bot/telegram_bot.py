@@ -1248,38 +1248,7 @@ class ChatGPTTelegramBot:
         user = update.inline_query.from_user if is_inline else update.message.from_user
         user_id = user.id
 
-        # Проверка одобрения пользователя через Supabase
-        # Если твой клиент синхронный, тогда убери await и сделай sync запрос
-        if not self.supabase.is_user_approved(user_id):
-            if is_inline:
-                await update.inline_query.answer(
-                    results=[],
-                    switch_pm_text="⛔️ Доступ запрещён. Подайте заявку.",
-                    switch_pm_parameter="start",
-                    cache_time=0
-                )
-            else:
-                await self.send_disallowed_message(update, context, is_inline=is_inline, reason="not_approved")
-            return False
-
-        name = user.name
-        if not await is_allowed(self.config, update, context, is_inline=is_inline):
-            logging.warning(f'User {name} (id: {user_id}) is not allowed to use the bot')
-            await self.send_disallowed_message(update, context, is_inline)
-            return False
-
-        if not is_within_budget(self.config, self.usage, update, is_inline=is_inline):
-            logging.warning(f'User {name} (id: {user_id}) reached their usage limit')
-            await self.send_budget_reached_message(update, context, is_inline)
-            return False
-
-        return True
-
-    async def check_allowed_and_within_budget(self, update: Update, context: ContextTypes.DEFAULT_TYPE, is_inline=False) -> bool:
-        user = update.inline_query.from_user if is_inline else update.message.from_user
-        user_id = user.id
-
-        # Получаем данные пользователя из Supabase
+    # 1) Проверяем, одобрен ли пользователь
         if not self.supabase.is_user_approved(user_id):
             if is_inline:
                 await update.inline_query.answer(
