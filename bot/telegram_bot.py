@@ -1017,20 +1017,6 @@ class ChatGPTTelegramBot:
         username = user.username or user.full_name
         await update.callback_query.answer()
 
-        # Проверка одобрения пользователя через supabase
-        def is_user_approved(user_id: int) -> bool:
-            resp = self.supabase.table('users').select('approved').eq('user_id', user_id).execute()
-            if resp.status_code == 200 and resp.data:
-                return resp.data[0]['approved'] is True
-            return False
-
-        # Получить все user_id из таблицы join_requests (список заявок)
-        def get_requests() -> set:
-            resp = self.supabase.table('join_requests').select('user_id').execute()
-            if resp.status_code == 200 and resp.data:
-                return set(item['user_id'] for item in resp.data)
-            return set()
-
         if callback_data == "start_dialog":
             # 1.1) Одобренный пользователь — сразу меню ролей
             if self.supabase.is_user_approved(user_id):
