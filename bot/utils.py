@@ -187,7 +187,12 @@ def is_admin(config, user_id: int, log_no_admin=False) -> bool:
 
 def get_user_budget(user_id: int, config: dict) -> float:
     db = SupabaseClient()
-    approved_users = [user['user_id'] for user in db.get_users() if user.get('status') == 'approved']
+    approved_users = [
+        int(uid)
+        for uid, record in db.get_users().items()
+        if record.get('status') == 'approved'
+    ]
+
 
     raw_budgets = config.get('user_budgets', '*')
     user_budgets = {}
