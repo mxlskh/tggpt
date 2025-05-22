@@ -1264,13 +1264,16 @@ class ChatGPTTelegramBot:
 
         # Проверка одобрения пользователя через Supabase
         # Если твой клиент синхронный, тогда убери await и сделай sync запрос
-        resp = self.supabase.table('users').select('approved').eq('user_id', user_id).execute()
-
-        if resp.status_code != 200 or not resp.data or not resp.data[0].get('approved', False):
+        if not self.supabase.is_user_approved(user_id):
             if is_inline:
-                await update.inline_query.answer(results=[], switch_pm_text="⛔️ Доступ запрещён. Подайте заявку.", switch_pm_parameter="start", cache_time=0)
+                await update.inline_query.answer(
+                    results=[],
+                    switch_pm_text="⛔️ Доступ запрещён. Подайте заявку.",
+                    switch_pm_parameter="start",
+                    cache_time=0
+                )
             else:
-                await update.message.reply_text("⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.")
+                await self.send_disallowed_message(update, context, is_inline=is_inline, reason="not_approved")
             return False
 
         name = user.name
