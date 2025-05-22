@@ -169,18 +169,18 @@ async def is_allowed(config, update: Update, context: CallbackContext, is_inline
 def is_admin(config, user_id: int, log_no_admin=False) -> bool:
     """
     Checks if the user is the admin of the bot.
-    The first user in the user list is the admin.
+    Expects admin_user_ids to be a list of ints.
     """
-    if config['admin_user_ids'] == '-':
+    ids = config.get('admin_user_ids', [])
+    if ids == '-' or not ids:
         if log_no_admin:
             logging.info('No admin user defined.')
         return False
 
-    admin_user_ids = config['admin_user_ids']  # это уже список
-
-    # Check if user is in the admin user list
-    if str(user_id) in admin_user_ids:
-        return True
+    # Если список целых — просто сравниваем по int,
+    # иначе поддержим и строки на всякий случай:
+    if isinstance(ids, list):
+        return (user_id in ids) or (str(user_id) in ids)
 
     return False
 
