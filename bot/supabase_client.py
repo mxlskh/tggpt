@@ -104,3 +104,9 @@ class SupabaseClient:
             }).execute()
         except Exception as e:
             print(f"[ERROR] reject_user: {e}")
+
+    def table(self, table_name: str):
+        """
+        Позволяет вызывать self.supabase.table('...') так же, как вы делали раньше.
+        """
+        return self.client.table(table_name)
