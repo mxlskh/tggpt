@@ -1244,11 +1244,18 @@ class ChatGPTTelegramBot:
                                           text=f"{query}\n\n_{answer_tr}:_\n{localized_answer} {str(e)}",
                                           is_inline=True)
 
-    async def check_allowed_and_within_budget(self, update: Update, context: ContextTypes.DEFAULT_TYPE, is_inline=False) -> bool:
+    async def check_allowed_and_within_budget(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        is_inline: bool = False
+    ) -> bool:
+        # 0) Вычисляем пользователя и его имя
         user = update.inline_query.from_user if is_inline else update.message.from_user
         user_id = user.id
+        user_name = user.username or user.full_name
 
-    # 1) Проверяем, одобрен ли пользователь
+        # 1) Проверяем, одобрен ли пользователь
         if not self.supabase.is_user_approved(user_id):
             if is_inline:
                 await update.inline_query.answer(
@@ -1263,16 +1270,19 @@ class ChatGPTTelegramBot:
                 )
             return False
 
+        # 2) Общие права (is_allowed)
         if not await is_allowed(self.config, update, context, is_inline=is_inline):
-            logging.warning(f'User {name} (id: {user_id}) is not allowed to use the bot')
+            logging.warning(f'User {user_name} (id: {user_id}) is not allowed to use the bot')
             await self.send_disallowed_message(update, context, is_inline)
             return False
 
+        # 3) Бюджет (is_within_budget)
         if not is_within_budget(self.config, self.usage, update, is_inline=is_inline):
-            logging.warning(f'User {name} (id: {user_id}) reached their usage limit')
+            logging.warning(f'User {user_name} (id: {user_id}) reached their usage limit')
             await self.send_budget_reached_message(update, context, is_inline)
             return False
 
+        # 4) Всё ок
         return True
 
     async def post_init(self, application: Application) -> None:
