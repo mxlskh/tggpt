@@ -1019,6 +1019,7 @@ class ChatGPTTelegramBot:
         user = update.effective_user
         user_id = user.id
         username = user.username or user.full_name
+        await update.callback_query.answer()
 
         # Проверка одобрения пользователя через supabase
         def is_user_approved(user_id: int) -> bool:
@@ -1035,7 +1036,7 @@ class ChatGPTTelegramBot:
             return set()
 
         if callback_data == "start_dialog":
-              # 1) Если пользователь уже одобрен — сразу в меню ролей
+            # 1.1) Одобренный пользователь — сразу меню ролей
             if self.supabase.is_user_approved(user_id):
                 keyboard = [
                     [InlineKeyboardButton("Преподаватель", callback_data="role_teacher")],
@@ -1045,10 +1046,11 @@ class ChatGPTTelegramBot:
                     "Выберите, кто вы:", reply_markup=InlineKeyboardMarkup(keyboard)
                 )
                 return
-                
+
+            # 1.2) Получаем все pending-заявки
             pending = self.supabase.get_pending_requests()
 
-                # 2) Если заявка уже есть — предупреждаем
+            # 1.3) Уже подавал заявку?
             if any(req.get("user_id") == user_id for req in pending):
                 await update.callback_query.answer(
                     "Вы уже подали заявку. Ожидайте одобрения администратора.",
@@ -1056,7 +1058,7 @@ class ChatGPTTelegramBot:
                 )
                 return
 
-                # 3) Добавляем новую заявку
+            # 1.4) Создаём новую заявку
             try:
                 self.supabase.add_join_request(user_id, username)
                 await update.callback_query.answer(
@@ -1071,26 +1073,30 @@ class ChatGPTTelegramBot:
                 )
                 return
 
-
-                # 4) Уведомляем всех админов о новой заявке
-            for admin_id in self.config["admin_user_ids"]:
-                await context.bot.send_message(
-                    chat_id=admin_id,
-                    text=(
-                        f"📨 Новая заявка от пользователя:\n\n"
-                        f"👤 {username} (ID: {user_id})"
+            # 1.5) Оповещаем админов
+            for admin_id in self.admin_user_ids:
+                try:
+                    await context.bot.send_message(
+                        chat_id=admin_id,
+                        text=(
+                            f"📨 Новая заявка от пользователя:\n\n"
+                            f"👤 {username} (ID: {user_id})"
+                        )
                     )
-                )
+                except Exception as e:
+                    logging.error(f"Ошибка при уведомлении админа {admin_id}: {e}")
             return
 
-        if not is_user_approved(user_id):
+        # 2) Всё остальное — только для одобренных
+        if not self.supabase.is_user_approved(user_id):
             await update.callback_query.answer(
-                "⛔️ Доступ запрещён. Пожалуйста, подайте заявку и дождитесь одобрения администратора.",
+                "⛔️ Доступ запрещён. Подайте заявку и дождитесь одобрения администратора.",
                 show_alert=True
             )
             return
 
-        elif callback_data == "role_teacher":
+        # 3) Выбор роли
+        if callback_data == "role_teacher":
             keyboard = [
                 [InlineKeyboardButton(lang, callback_data=f"teacher_lang_{lang.lower()}")]
                 for lang in ["Английский", "Китайский", "Французский", "Немецкий", "Итальянский", "Польский"]
@@ -1100,7 +1106,7 @@ class ChatGPTTelegramBot:
             )
             return
 
-        elif callback_data == "role_student":
+        if callback_data == "role_student":
             keyboard = [
                 [InlineKeyboardButton(lang, callback_data=f"student_lang_{lang.lower()}")]
                 for lang in ["Английский", "Китайский", "Французский", "Немецкий", "Итальянский", "Польский"]
@@ -1110,15 +1116,19 @@ class ChatGPTTelegramBot:
             )
             return
 
-        elif callback_data.startswith("teacher_lang_"):
+        # 4) Приветствие после выбора языка
+        if callback_data.startswith("teacher_lang_"):
             await update.callback_query.edit_message_text(
-                "Привет! Ты можешь присылать сюда файлы, изображения и тексты для проверки, просить сгенерировать задания на нужную тему, голосовые сообщения и другое."
+                "Привет! Ты можешь присылать сюда файлы, изображения и тексты для проверки, "
+                "просить сгенерировать задания на нужную тему, голосовые сообщения и другое."
             )
             return
 
-        elif callback_data.startswith("student_lang_"):
+        if callback_data.startswith("student_lang_"):
             await update.callback_query.edit_message_text(
-                "Привет! Я могу давать материал для изучения, проверить твой уровень знаний, отправлять тесты и проверять их, генерировать голосовые сообщения для практики прослушки и принимать твои для практики разговора."
+                "Привет! Я могу давать материал для изучения, проверить твой уровень знаний, "
+                "отправлять тесты и проверять их, генерировать голосовые сообщения для практики прослушки "
+                "и принимать твои для практики разговора."
             )
             return
 
@@ -1420,6 +1430,7 @@ class ChatGPTTelegramBot:
     async def handle_admin_buttons(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         data = query.data
+        await query.answer()
 
         if not isinstance(data, str):
             logging.error(f"callback_query.data is not a string! type: {type(data)}, value: {data}")
@@ -1431,69 +1442,65 @@ class ChatGPTTelegramBot:
 
         await query.answer()
 
+        # 1) Список участников
         if data == "admin_list_users":
             users = self.supabase.get_users()
-            text = "\n".join([f"{uid} — {user.get('username', 'Без имени')}" for uid, user in users.items()])
-            if not text:
-                text = "Пользователей нет."
+            text = "\n".join([f"{uid}: {rec.get('username')}" for uid, rec in users.items()]) or "Нет участников."
             await query.edit_message_text(text)
             return
 
-        elif data == "admin_view_requests":
+        # 2) Заявки на вступление
+        if data == "admin_view_requests":
             requests = self.supabase.get_requests()
             if not requests:
                 await query.edit_message_text("Заявок нет.")
                 return
 
-            text_lines = []
             keyboard = []
             for uid, info in requests.items():
-                name = info.get("name", "Без имени")
-                text_lines.append(f"{uid} — {name}")
                 keyboard.append([
-                    InlineKeyboardButton("✅ Одобрить", callback_data=f"approve_request_{uid}"),
-                    InlineKeyboardButton("❌ Отклонить", callback_data=f"reject_request_{uid}")
+                    InlineKeyboardButton("✅", callback_data=f"approve_request_{uid}"),
+                    InlineKeyboardButton("❌", callback_data=f"reject_request_{uid}"),
+                    InlineKeyboardButton(f"{info.get('username')} ({uid})", callback_data="noop")
                 ])
-
-            text = "\n".join(text_lines)
-            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.edit_message_text(
+                "📝 Заявки на вступление:",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
             return
 
-        elif data.startswith("approve_request_"):
-            # 1) Извлекаем ID и приводим к int
+        # 3) Заблокированные
+        if data == "admin_blocked_users":
+            blocked = self.supabase.get_blocked_users()
+            text = "\n".join(map(str, blocked)) or "Нет заблокированных."
+            await query.edit_message_text(text)
+            return
+
+        # 4) Одобрить заявку
+        if data.startswith("approve_request_"):
             str_uid = data.split("_")[-1]
             user_id = int(str_uid)
+            requests = self.supabase.get_requests()
+            username = requests.get(str_uid, {}).get("username", "")
 
-            # 2) Берём username прямо из pending-заявок
-            requests = self.supabase.get_requests()  # { '12345': {'user_id':12345,'username':'ivan'} }
-            info = requests.get(str_uid, {})
-            username = info.get("username", "")
-
-            # 3) Переносим запись в users и удаляем из join_requests
             try:
-                self.supabase.approve_user(user_id, username)  # качаем метод из supabase_client.py :contentReference[oaicite:1]{index=1}
-
-                # 4) Уведомляем пользователя о том, что его заявка одобрена
+                self.supabase.approve_user(user_id, username)
                 await context.bot.send_message(
                     chat_id=user_id,
                     text="✅ Ваша заявка одобрена! Теперь вы можете пользоваться ботом."
                 )
-
-                # 5) Обновляем сообщение админа
                 await query.edit_message_text("✅ Заявка одобрена и пользователь уведомлён.")
             except Exception as e:
                 logging.error(f"Ошибка при одобрении заявки: {e}")
-                await query.answer("❗️Не удалось одобрить заявку. Посмотрите логи.", show_alert=True)
+                await query.answer("❗️Не удалось одобрить заявку.", show_alert=True)
             return
 
-        elif data.startswith("reject_request_"):
+        # 5) Отклонить заявку
+        if data.startswith("reject_request_"):
             str_uid = data.split("_")[-1]
             user_id = int(str_uid)
-
-            # Удаляем из запросов и (по желанию) вносим в заблокированные
             try:
                 self.supabase.reject_user(user_id)
-                # уведомляем пользователя
                 await context.bot.send_message(
                     chat_id=user_id,
                     text="❌ Ваша заявка отклонена."
@@ -1503,7 +1510,6 @@ class ChatGPTTelegramBot:
                 logging.error(f"Ошибка при отклонении заявки: {e}")
                 await query.answer("❗️Не удалось отклонить заявку.", show_alert=True)
             return
-
         elif data == "admin_blocked_users":
             blocked = self.supabase.get_blocked_users()
             text = "\n".join(map(str, blocked)) if blocked else "Заблокированных пользователей нет."
@@ -1531,17 +1537,13 @@ class ChatGPTTelegramBot:
     
     async def admin_panel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
-
-        # Проверка прав администратора (предположим, метод self.is_admin использует Supabase или локальный список)
-        if not self.is_admin(user_id):  # Сделай is_admin асинхронным, если данные идут из Supabase
+        if not is_admin(self.config, user_id):
             await update.message.reply_text("❌ У вас нет доступа к этой команде.")
             return
 
         keyboard = [
-            [InlineKeyboardButton("📋 Просмотреть участников", callback_data="admin_list_users")],
-            [InlineKeyboardButton("📝 Заявки на вступление", callback_data="admin_view_requests")],
-            [InlineKeyboardButton("🚫 Заблокированные пользователи", callback_data="admin_blocked_users")]
+            [InlineKeyboardButton("📋 Просмотреть участников",    callback_data="admin_list_users")],
+            [InlineKeyboardButton("📝 Заявки на вступление",     callback_data="admin_view_requests")],
+            [InlineKeyboardButton("🚫 Заблокированные пользователи", callback_data="admin_blocked_users")],
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await update.message.reply_text("🛠 Админ-панель:", reply_markup=reply_markup)
+        await update.message.reply_text("🛠 Админ-панель:", reply_markup=InlineKeyboardMarkup(keyboard))
