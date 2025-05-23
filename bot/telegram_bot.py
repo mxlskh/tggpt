@@ -1424,9 +1424,32 @@ class ChatGPTTelegramBot:
 
         # 1) Список участников
         if data == "admin_list_users":
+    # Получаем всех пользователей из Supabase
             users = self.supabase.get_users()
-            text = "\n".join([f"{uid}: {rec.get('username')}" for uid, rec in users.items()]) or "Нет участников."
-            await query.edit_message_text(text)
+
+    # Формируем клавиатуру: для каждого user_id — кнопка блокировки + подпись
+            keyboard = []
+            for uid, rec in users.items():
+                username = rec.get("username", "Без имени")
+                keyboard.append([
+                    InlineKeyboardButton(
+                        "🚫 Заблокировать",
+                        callback_data=f"block_user_{uid}"
+                    ),
+                    InlineKeyboardButton(
+                        f"{username} ({uid})",
+                        callback_data="noop"
+                    )
+                ])
+
+    # Если пользователей нет, просто выводим сообщение
+            if not keyboard:
+                await query.edit_message_text("Нет участников.")
+            else:
+                await query.edit_message_text(
+                    "📋 Список участников:",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
             return
 
         # 2) Заявки на вступление
