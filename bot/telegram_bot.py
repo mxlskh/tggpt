@@ -122,8 +122,8 @@ class ChatGPTTelegramBot:
         self.commands = [
             BotCommand(command='help', description=localized_text('help_description', bot_language)),
             BotCommand(command='reset', description=localized_text('reset_description', bot_language)),
-            BotCommand(command='stats', description=localized_text('stats_description', bot_language)),
-            BotCommand(command='resend', description=localized_text('resend_description', bot_language))
+            #BotCommand(command='stats', description=localized_text('stats_description', bot_language)),
+            #BotCommand(command='resend', description=localized_text('resend_description', bot_language))
         ]
 
         # Команды по фичам
@@ -1332,8 +1332,8 @@ class ChatGPTTelegramBot:
         application.add_handler(CommandHandler('image', self.image))
         application.add_handler(CommandHandler('tts', self.tts))
         application.add_handler(CommandHandler('start', self.help))
-        application.add_handler(CommandHandler('stats', self.stats))
-        application.add_handler(CommandHandler('resend', self.resend))
+        #application.add_handler(CommandHandler('stats', self.stats))
+        #application.add_handler(CommandHandler('resend', self.resend))
         application.add_handler(CommandHandler(
             'chat', self.prompt, filters=filters.ChatType.GROUP | filters.ChatType.SUPERGROUP)
         )
