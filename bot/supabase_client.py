@@ -73,7 +73,7 @@ class SupabaseClient:
         Возвращает список user_id всех заблокированных пользователей.
         """
         try:
-            response = self.client.table("blocked_users").select("user_id").execute()
+            response = self.client.table("blocked_users").select("user_id, username").execute()
             records = response.data or []
             return [item.get("user_id") for item in records]
         except Exception as e:
@@ -117,7 +117,17 @@ class SupabaseClient:
     
     def block_user(self, user_id: int):
         try:
-            self.client.table("blocked_users").upsert({"user_id": user_id}).execute()
+            # Получаем username перед удалением
+            response = self.client.table("users").select("username").eq("id", str(user_id)).execute()
+            username = response.data[0].get("username", "") if response.data else ""
+
+            # Добавляем в блокированные
+            self.client.table("blocked_users").upsert({
+                "user_id": user_id,
+                "username": username
+            }).execute()
+
+            # Удаляем из users
             self.client.table("users").delete().eq("id", str(user_id)).execute()
         except Exception as e:
             print(f"[ERROR] block_user: {e}")

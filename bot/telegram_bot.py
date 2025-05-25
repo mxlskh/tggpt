@@ -1475,9 +1475,25 @@ class ChatGPTTelegramBot:
         # 3) Заблокированные
         if data == "admin_blocked_users":
             blocked = self.supabase.get_blocked_users()
-            text = "\n".join(map(str, blocked)) or "Нет заблокированных."
-            await query.edit_message_text(text)
+            if not blocked:
+                await query.edit_message_text("Заблокированных пользователей нет.")
+                return
+
+            keyboard = []
+            text_lines = []
+
+            for user in blocked:
+                uid = user.get("user_id")
+                username = user.get("username") or "Без имени"
+                text_lines.append(f"{uid} — {username}")
+                keyboard.append([
+                    InlineKeyboardButton(f"🔓 Разблокировать", callback_data=f"unblock_user_{uid}")
+                ])
+
+            text = "🚫 Заблокированные пользователи:\n\n" + "\n".join(text_lines)
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
             return
+
 
         # 4) Одобрить заявку
         if data.startswith("approve_request_"):
