@@ -1033,8 +1033,8 @@ class ChatGPTTelegramBot:
         if callback_data == "start_dialog":
             if self.supabase.is_user_approved(user_id):
                 keyboard = [
-                    [InlineKeyboardButton("Преподаватель", callback_data="role_teacher")],
-                    [InlineKeyboardButton("Ученик",       callback_data="role_student")],
+                    [InlineKeyboardButton("👨‍🏫/👩‍🏫 Преподаватель", callback_data="role_teacher")],
+                    [InlineKeyboardButton("👨‍🎓/👩‍🎓 Ученик",       callback_data="role_student")],
                 ]
                 await query.edit_message_text(
                     "Выберите, кто вы:", reply_markup=InlineKeyboardMarkup(keyboard)
@@ -1077,8 +1077,8 @@ class ChatGPTTelegramBot:
 
         # 3) Выбор роли
         if callback_data == "role_teacher":
-            langs = ["Английский", "Испанский", "Китайский", "Французский", "Арабский",
-                     "Русский", "Немецкий", "Португальский", "Японский", "Итальянский"]
+            langs = ["🇺🇸/🇬🇧  Английский", "🇪🇸 Испанский", "🇨🇳 Китайский", "🇫🇷 Французский", "🇦🇪 Арабский",
+                     "🇷🇺 Русский", "🇩🇪 Немецкий", "🇵🇹 Португальский", "🇯🇵 Японский", "🇮🇹 Итальянский"]
             keyboard = [
                 [InlineKeyboardButton(lang, callback_data=f"teacher_lang_{lang.lower()}")]
                 for lang in langs
@@ -1087,8 +1087,8 @@ class ChatGPTTelegramBot:
             return
 
         if callback_data == "role_student":
-            langs = ["Английский", "Испанский", "Китайский", "Французский", "Арабский",
-                     "Русский", "Немецкий", "Португальский", "Японский", "Итальянский"]
+            langs = ["🇺🇸/🇬🇧  Английский", "🇪🇸 Испанский", "🇨🇳 Китайский", "🇫🇷 Французский", "🇦🇪 Арабский",
+                     "🇷🇺 Русский", "🇩🇪 Немецкий", "🇵🇹 Португальский", "🇯🇵 Японский", "🇮🇹 Итальянский"]
             keyboard = [
                 [InlineKeyboardButton(lang, callback_data=f"student_lang_{lang.lower()}")]
                 for lang in langs
