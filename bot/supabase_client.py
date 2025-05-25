@@ -68,17 +68,14 @@ class SupabaseClient:
             print(f"[ERROR] get_users: {e}")
             return {}
 
-    def get_blocked_users(self) -> list[int]:
-        """
-        Возвращает список user_id всех заблокированных пользователей.
-        """
+    def get_blocked_users(self) -> list[dict]:
         try:
             response = self.client.table("blocked_users").select("user_id, username").execute()
-            records = response.data or []
-            return [item.get("user_id") for item in records]
+            return response.data or []
         except Exception as e:
             print(f"[ERROR] get_blocked_users: {e}")
             return []
+
 
     def add_join_request(self, user_id: int, username: str):
         try:
@@ -121,16 +118,15 @@ class SupabaseClient:
             response = self.client.table("users").select("username").eq("id", str(user_id)).execute()
             username = response.data[0].get("username", "") if response.data else ""
 
-            # Добавляем в блокированные
             self.client.table("blocked_users").upsert({
                 "user_id": user_id,
                 "username": username
             }).execute()
 
-            # Удаляем из users
             self.client.table("users").delete().eq("id", str(user_id)).execute()
         except Exception as e:
             print(f"[ERROR] block_user: {e}")
+
 
     def unblock_user(self, user_id: int):
         try:
