@@ -114,3 +114,16 @@ class SupabaseClient:
         Позволяет вызывать self.supabase.table('...') так же, как вы делали раньше.
         """
         return self.client.table(table_name)
+    
+    def block_user(self, user_id: int):
+        try:
+            self.client.table("blocked_users").upsert({"user_id": user_id}).execute()
+            self.client.table("users").delete().eq("id", str(user_id)).execute()
+        except Exception as e:
+            print(f"[ERROR] block_user: {e}")
+
+    def unblock_user(self, user_id: int):
+        try:
+            self.client.table("blocked_users").delete().eq("user_id", user_id).execute()
+        except Exception as e:
+            print(f"[ERROR] unblock_user: {e}")
