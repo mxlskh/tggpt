@@ -11,6 +11,10 @@ class SupabaseClient:
 
     def is_user_approved(self, user_id: int) -> bool:
         try:
+            blocked = self.is_blocked(user_id)
+            if blocked:
+                return False
+
             response = self.client.table("users").select("status").eq("id", str(user_id)).execute()
             users = response.data
             return bool(users and users[0].get("status") == "approved")

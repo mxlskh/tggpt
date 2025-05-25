@@ -1515,9 +1515,21 @@ class ChatGPTTelegramBot:
             return
         elif data == "admin_blocked_users":
             blocked = self.supabase.get_blocked_users()
-            text = "\n".join(map(str, blocked)) if blocked else "Заблокированных пользователей нет."
-            await query.edit_message_text(text)
+            if not blocked:
+                await query.edit_message_text("Заблокированных пользователей нет.")
+                return
+
+            keyboard = []
+            for user_id in blocked:
+                keyboard.append([
+                    InlineKeyboardButton(f"🔓 Разблокировать {user_id}", callback_data=f"unblock_user_{user_id}")
+                ])
+            await query.edit_message_text(
+                "🚫 Заблокированные пользователи:",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
             return
+
 
         elif data.startswith("unblock_user_"):
             user_id = data.split("_")[-1]
@@ -1526,9 +1538,18 @@ class ChatGPTTelegramBot:
             return
 
         elif data.startswith("block_user_"):
-            user_id = data.split("_")[-1]
-            self.supabase.block_user(user_id)
-            await query.edit_message_text("Пользователь заблокирован.")
+            str_uid = data.split("_")[-1]
+            user_id = int(str_uid)
+            try:
+                self.supabase.block_user(user_id)
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="🚫 Вы были заблокированы и больше не можете использовать этого бота."
+                )
+                await query.edit_message_text("Пользователь заблокирован и уведомлён.")
+            except Exception as e:
+                logging.error(f"Ошибка при блокировке пользователя: {e}")
+                await query.answer("❗️Не удалось заблокировать пользователя.", show_alert=True)
             return
 
         if data == 'admin_approve':
