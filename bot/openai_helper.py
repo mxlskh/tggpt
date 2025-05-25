@@ -563,13 +563,13 @@ class OpenAIHelper:
         yield answer, tokens_used
 
     def reset_chat_history(self, chat_id, content=''):
-        """
-        Resets the conversation history.
-        """
         if content == '':
             content = self.config['assistant_prompt']
-        self.conversations[chat_id] = [{"role": "assistant" if self.config['model'] in O_MODELS else "system", "content": content}]
+        self.conversations[chat_id] = [
+            { "role": "system", "content": content }
+        ]
         self.conversations_vision[chat_id] = False
+
 
     def __max_age_reached(self, chat_id) -> bool:
         """

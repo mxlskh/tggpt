@@ -117,6 +117,7 @@ class ChatGPTTelegramBot:
         self.openai = openai
         self.supabase = supabase
         self.db = SupabaseClient()
+        self.user_profiles: dict[int, dict[str, str]] = {}  # { user_id: {'role': 'teacher'|'student', 'lang': 'Английский'}, ... }
         bot_language = self.config['bot_language']
 
         self.commands = [
@@ -1021,51 +1022,38 @@ class ChatGPTTelegramBot:
             logging.error(f'An error occurred while generating the result card for inline query {e}')
 
     async def handle_callback_inline_query(self, update: Update, context: CallbackContext):
-        callback_data = update.callback_query.data
+        query = update.callback_query
+        callback_data = query.data
         user = update.effective_user
         user_id = user.id
         username = user.username or user.full_name
-        await update.callback_query.answer()
+        await query.answer()
 
+        # 1) Начало диалога / выбор подачи заявки
         if callback_data == "start_dialog":
-            # 1.1) Одобренный пользователь — сразу меню ролей
             if self.supabase.is_user_approved(user_id):
                 keyboard = [
                     [InlineKeyboardButton("Преподаватель", callback_data="role_teacher")],
                     [InlineKeyboardButton("Ученик",       callback_data="role_student")],
                 ]
-                await update.callback_query.edit_message_text(
+                await query.edit_message_text(
                     "Выберите, кто вы:", reply_markup=InlineKeyboardMarkup(keyboard)
                 )
                 return
 
-            # 1.2) Получаем все pending-заявки
             pending = self.supabase.get_pending_requests()
-
-            # 1.3) Уже подавал заявку?
             if any(req.get("user_id") == user_id for req in pending):
-                await update.callback_query.answer(
-                    "Вы уже подали заявку. Ожидайте одобрения администратора.",
-                    show_alert=True
-                )
+                await query.answer("Вы уже подали заявку. Ожидайте одобрения администратора.", show_alert=True)
                 return
 
-            # 1.4) Создаём новую заявку
             try:
                 self.supabase.add_join_request(user_id, username)
-                await update.callback_query.answer(
-                    "✅ Заявка отправлена. Ожидайте одобрения администратора.",
-                    show_alert=True
-                )
+                await query.answer("✅ Заявка отправлена. Ожидайте одобрения администратора.", show_alert=True)
             except Exception as e:
                 logging.error(f"[ERROR] add_join_request: {e}")
-                await update.callback_query.answer(
-                    "❗️ Ошибка при отправке заявки. Попробуйте позже.",
-                    show_alert=True
-                )
+                await query.answer("❗️ Ошибка при отправке заявки. Попробуйте позже.", show_alert=True)
                 return
 
-            # 1.5) Оповещаем админов
             for admin_id in self.admin_user_ids:
                 try:
                     await context.bot.send_message(
@@ -1081,7 +1069,7 @@ class ChatGPTTelegramBot:
 
         # 2) Всё остальное — только для одобренных
         if not self.supabase.is_user_approved(user_id):
-            await update.callback_query.answer(
+            await query.answer(
                 "⛔️ Доступ запрещён. Подайте заявку и дождитесь одобрения администратора.",
                 show_alert=True
             )
@@ -1089,170 +1077,138 @@ class ChatGPTTelegramBot:
 
         # 3) Выбор роли
         if callback_data == "role_teacher":
+            langs = ["Английский", "Испанский", "Китайский", "Французский", "Арабский",
+                     "Русский", "Немецкий", "Португальский", "Японский", "Итальянский"]
             keyboard = [
                 [InlineKeyboardButton(lang, callback_data=f"teacher_lang_{lang.lower()}")]
-                for lang in ["Английский", "Китайский", "Французский", "Немецкий", "Итальянский", "Польский"]
+                for lang in langs
             ]
-            await update.callback_query.edit_message_text(
-                "Выберите язык преподавания:", reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+            await query.edit_message_text("Выберите язык преподавания:", reply_markup=InlineKeyboardMarkup(keyboard))
             return
 
         if callback_data == "role_student":
+            langs = ["Английский", "Испанский", "Китайский", "Французский", "Арабский",
+                     "Русский", "Немецкий", "Португальский", "Японский", "Итальянский"]
             keyboard = [
                 [InlineKeyboardButton(lang, callback_data=f"student_lang_{lang.lower()}")]
-                for lang in ["Английский", "Китайский", "Французский", "Немецкий", "Итальянский", "Польский"]
+                for lang in langs
             ]
-            await update.callback_query.edit_message_text(
-                "Выберите язык изучения:", reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+            await query.edit_message_text("Выберите язык изучения:", reply_markup=InlineKeyboardMarkup(keyboard))
             return
 
-        # 4) Приветствие после выбора языка
+        # 4) Настройка промта и сообщение-подтверждение
         if callback_data.startswith("teacher_lang_"):
-            await update.callback_query.edit_message_text(
-                "Привет! Ты можешь присылать сюда файлы, изображения и тексты для проверки, "
-                "просить сгенерировать задания на нужную тему, голосовые сообщения и другое."
+            lang = callback_data.split("teacher_lang_")[-1].capitalize()
+            # Сохраняем профиль
+            self.user_profiles[user_id] = {'role': 'teacher', 'lang': lang}
+            # Устанавливаем динамический системный промт
+            self.set_dynamic_prompt(chat_id=user_id)
+            await query.edit_message_text(
+                f"✅ Отлично! Я настроен как помощник-преподаватель по {lang}. "
+                "Можешь присылать тексты для проверки, запросы на упражнения и т. д."
             )
             return
 
         if callback_data.startswith("student_lang_"):
-            await update.callback_query.edit_message_text(
-                "Привет! Я могу давать материал для изучения, проверить твой уровень знаний, "
-                "отправлять тесты и проверять их, генерировать голосовые сообщения для практики прослушки "
-                "и принимать твои для практики разговора."
+            lang = callback_data.split("student_lang_")[-1].capitalize()
+            self.user_profiles[user_id] = {'role': 'student', 'lang': lang}
+            self.set_dynamic_prompt(chat_id=user_id)
+            await query.edit_message_text(
+                f"✅ Готово! Я настроен как твой тьютор по изучению {lang}. "
+                "Буду присылать упражнения, объяснения грамматики и проверять твои ответы."
             )
             return
 
-        user_id = update.callback_query.from_user.id
-        inline_message_id = update.callback_query.inline_message_id
-        name = update.callback_query.from_user.name
+        # 5) Обработка inline-GPT-кнопки (gpt:...)
+        inline_message_id = query.inline_message_id
         callback_data_suffix = "gpt:"
-        query = ""
         bot_language = self.config['bot_language']
         answer_tr = localized_text("answer", bot_language)
         loading_tr = localized_text("loading", bot_language)
 
         try:
             if callback_data.startswith(callback_data_suffix):
-                unique_id = callback_data.split(':')[1]
+                unique_id = callback_data.split(":", 1)[1]
                 total_tokens = 0
+                query_text = self.inline_queries_cache.pop(unique_id, None)
 
-                # Retrieve the prompt from the cache
-                query = self.inline_queries_cache.get(unique_id)
-                if query:
-                    self.inline_queries_cache.pop(unique_id)
-                else:
-                    error_message = (
-                        f'{localized_text("error", bot_language)}. '
-                        f'{localized_text("try_again", bot_language)}'
+                if query_text is None:
+                    err = f"{localized_text('error', bot_language)}. {localized_text('try_again', bot_language)}"
+                    await edit_message_with_retry(
+                        context, chat_id=None, message_id=inline_message_id,
+                        text=f"\n\n_{answer_tr}:_\n{err}", is_inline=True
                     )
-                    await edit_message_with_retry(context, chat_id=None, message_id=inline_message_id,
-                                                  text=f'{query}\n\n_{answer_tr}:_\n{error_message}',
-                                                  is_inline=True)
                     return
 
-                unavailable_message = localized_text("function_unavailable_in_inline_mode", bot_language)
+                unavailable = localized_text("function_unavailable_in_inline_mode", bot_language)
                 if self.config['stream']:
-                    stream_response = self.openai.get_chat_response_stream(chat_id=user_id, query=query)
-                    i = 0
-                    prev = ''
-                    backoff = 0
+                    stream_response = self.openai.get_chat_response_stream(chat_id=user_id, query=query_text)
+                    i = 0; prev = ""; backoff = 0; stream_chunk = 0
                     async for content, tokens in stream_response:
                         if is_direct_result(content):
                             cleanup_intermediate_files(content)
-                            await edit_message_with_retry(context, chat_id=None,
-                                                          message_id=inline_message_id,
-                                                          text=f'{query}\n\n_{answer_tr}:_\n{unavailable_message}',
-                                                          is_inline=True)
+                            await edit_message_with_retry(
+                                context, chat_id=None, message_id=inline_message_id,
+                                text=f"{query_text}\n\n_{answer_tr}:_\n{unavailable}", is_inline=True
+                            )
                             return
 
-                        if len(content.strip()) == 0:
+                        if not content.strip():
                             continue
 
-                        cutoff = get_stream_cutoff_values(update, content)
-                        cutoff += backoff
+                        chunks = split_into_chunks(content)
+                        if len(chunks) > 1 and stream_chunk != len(chunks) - 1:
+                            stream_chunk += 1
+                            continue
 
+                        cutoff = get_stream_cutoff_values(update, content) + backoff
                         if i == 0:
-                            try:
-                                await edit_message_with_retry(context, chat_id=None,
-                                                              message_id=inline_message_id,
-                                                              text=f'{query}\n\n{answer_tr}:\n{content}',
-                                                              is_inline=True)
-                            except:
-                                continue
-
+                            await edit_message_with_retry(
+                                context, chat_id=None, message_id=inline_message_id,
+                                text=f"{query_text}\n\n{answer_tr}:\n{content}", is_inline=True
+                            )
                         elif abs(len(content) - len(prev)) > cutoff or tokens != 'not_finished':
                             prev = content
-                            try:
-                                use_markdown = tokens != 'not_finished'
-                                divider = '_' if use_markdown else ''
-                                text = f'{query}\n\n{divider}{answer_tr}:{divider}\n{content}'
-
-                                # We only want to send the first 4096 characters. No chunking allowed in inline mode.
-                                text = text[:4096]
-
-                                await edit_message_with_retry(context, chat_id=None, message_id=inline_message_id,
-                                                              text=text, markdown=use_markdown, is_inline=True)
-
-                            except RetryAfter as e:
-                                backoff += 5
-                                await asyncio.sleep(e.retry_after)
-                                continue
-                            except TimedOut:
-                                backoff += 5
-                                await asyncio.sleep(0.5)
-                                continue
-                            except Exception:
-                                backoff += 5
-                                continue
-
-                            await asyncio.sleep(0.01)
-
+                            use_md = tokens != 'not_finished'
+                            await edit_message_with_retry(
+                                context, chat_id=None, message_id=inline_message_id,
+                                text=f"{query_text}\n\n{'_' if use_md else ''}{answer_tr}{'_' if use_md else ''}:\n{content}"[:4096],
+                                markdown=use_md, is_inline=True
+                            )
                         i += 1
                         if tokens != 'not_finished':
                             total_tokens = int(tokens)
-
                 else:
                     async def _send_inline_query_response():
                         nonlocal total_tokens
-                        # Edit the current message to indicate that the answer is being processed
-                        await context.bot.edit_message_text(inline_message_id=inline_message_id,
-                                                            text=f'{query}\n\n_{answer_tr}:_\n{loading_tr}',
-                                                            parse_mode=constants.ParseMode.MARKDOWN)
-
-                        logging.info(f'Generating response for inline query by {name}')
-                        response, total_tokens = await self.openai.get_chat_response(chat_id=user_id, query=query)
-
+                        await context.bot.edit_message_text(
+                            inline_message_id, f"{query_text}\n\n_{answer_tr}:_\n{loading_tr}",
+                            parse_mode=constants.ParseMode.MARKDOWN
+                        )
+                        response, total_tokens = await self.openai.get_chat_response(chat_id=user_id, query=query_text)
                         if is_direct_result(response):
                             cleanup_intermediate_files(response)
-                            await edit_message_with_retry(context, chat_id=None,
-                                                          message_id=inline_message_id,
-                                                          text=f'{query}\n\n_{answer_tr}:_\n{unavailable_message}',
-                                                          is_inline=True)
+                            await edit_message_with_retry(
+                                context, chat_id=None, message_id=inline_message_id,
+                                text=f"{query_text}\n\n_{answer_tr}:_\n{unavailable}", is_inline=True
+                            )
                             return
-
-                        text_content = f'{query}\n\n_{answer_tr}:_\n{response}'
-
-                        # We only want to send the first 4096 characters. No chunking allowed in inline mode.
-                        text_content = text_content[:4096]
-
-                        # Edit the original message with the generated content
-                        await edit_message_with_retry(context, chat_id=None, message_id=inline_message_id,
-                                                      text=text_content, is_inline=True)
-
-                    await wrap_with_indicator(update, context, _send_inline_query_response,
-                                              constants.ChatAction.TYPING, is_inline=True)
+                        text_content = f"{query_text}\n\n_{answer_tr}:_\n{response}"[:4096]
+                        await edit_message_with_retry(
+                            context, chat_id=None, message_id=inline_message_id,
+                            text=text_content, is_inline=True
+                        )
+                    await wrap_with_indicator(update, context, _send_inline_query_response, constants.ChatAction.TYPING, is_inline=True)
 
                 add_chat_request_to_usage_tracker(self.usage, self.config, user_id, total_tokens)
 
         except Exception as e:
-            logging.error(f'Failed to respond to an inline query via button callback: {e}')
-            logging.exception(e)
+            logging.error(f"Inline callback error: {e}")
             localized_answer = localized_text('chat_fail', self.config['bot_language'])
-            await edit_message_with_retry(context, chat_id=None, message_id=inline_message_id,
-                                          text=f"{query}\n\n_{answer_tr}:_\n{localized_answer} {str(e)}",
-                                          is_inline=True)
+            await edit_message_with_retry(
+                context, chat_id=None, message_id=inline_message_id,
+                text=f"\n\n_{answer_tr}:_\n{localized_answer} {e}", is_inline=True
+            )
 
     async def check_allowed_and_within_budget(
         self,
@@ -1616,3 +1572,31 @@ class ChatGPTTelegramBot:
 
         # 4) Отчёт в чат админа
         await update.message.reply_text(f"✅ Рассылка выполнена: отправлено {count} сообщения(й).")
+
+    def set_dynamic_prompt(self, chat_id: int):
+        """
+        Сбрасывает историю и ставит системное сообщение
+        в зависимости от role/lang в self.user_profiles.
+        """
+        profile = self.user_profiles.get(chat_id)
+        if not profile:
+            return
+
+        role = profile['role']      # 'teacher' или 'student'
+        lang = profile['lang']      # e.g. 'Английский'
+
+        if role == 'teacher':
+            prompt = (
+                f"You are a helpful assistant acting as a {lang} language teacher. "
+                "You help create exercises, correct texts, give feedback and generate "
+                "spoken practice prompts."
+            )
+        else:
+            prompt = (
+                f"You are a helpful assistant tutoring a student learning {lang}. "
+                "You provide grammar explanations, vocabulary exercises, listening "
+                "and speaking practice, and assess user answers."
+            )
+
+        # Сброс истории чата с новым системным сообщением:
+        self.openai.reset_chat_history(chat_id=chat_id, content=prompt)
