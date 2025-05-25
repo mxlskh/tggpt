@@ -88,12 +88,24 @@ class SupabaseClient:
 
     def approve_user(self, user_id: int, username: str):
         try:
+            # 1) Удалить из заблокированных, если там есть
+            self.client.table("blocked_users")\
+                .delete()\
+                .eq("user_id", user_id)\
+                .execute()
+
+            # 2) Добавить в таблицу users
             self.client.table("users").insert({
                 "id": str(user_id),
                 "username": username,
                 "status": "approved"
             }).execute()
-            self.client.table("join_requests").delete().eq("user_id", user_id).execute()
+
+            # 3) Удалить из join_requests
+            self.client.table("join_requests")\
+                .delete()\
+                .eq("user_id", user_id)\
+                .execute()
         except Exception as e:
             print(f"[ERROR] approve_user: {e}")
 
