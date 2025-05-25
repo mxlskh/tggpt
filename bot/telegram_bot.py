@@ -1047,12 +1047,21 @@ class ChatGPTTelegramBot:
                 return
 
             try:
+                # Сохраняем заявку в базе
                 self.supabase.add_join_request(user_id, username)
-                await query.answer("✅ Заявка отправлена. Ожидайте одобрения администратора.", show_alert=True)
+
+                # 1) всплывающее уведомление (необязательно, можно убрать)
+                await query.answer("✅ Заявка отправлена.", show_alert=True)
+
+                # 2) и дублируем его обычным сообщением в чат
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="✅ Ваша заявка успешно отправлена! Ожидайте одобрения администратора."
+                )
             except Exception as e:
                 logging.error(f"[ERROR] add_join_request: {e}")
                 await query.answer("❗️ Ошибка при отправке заявки. Попробуйте позже.", show_alert=True)
-                return
+
 
             for admin_id in self.admin_user_ids:
                 try:
