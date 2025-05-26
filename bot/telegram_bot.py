@@ -1609,3 +1609,10 @@ class ChatGPTTelegramBot:
 
         # Сброс истории чата с новым системным сообщением:
         self.openai.reset_chat_history(chat_id=chat_id, content=prompt)
+
+    async def send_budget_reached_message(self, update, context, is_inline=False):
+        message = "⛔️ Вы использовали лимит запросов в тестовом режиме. Чтобы продолжить, оформите подписку."
+        if is_inline:
+            await update.inline_query.answer([], switch_pm_text=message, switch_pm_parameter="start", cache_time=0)
+        else:
+            await update.message.reply_text(message)
