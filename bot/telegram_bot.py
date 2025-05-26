@@ -970,7 +970,12 @@ class ChatGPTTelegramBot:
                 await wrap_with_indicator(update, context, _reply, constants.ChatAction.TYPING)
 
             add_chat_request_to_usage_tracker(self.usage, self.config, user_id, total_tokens)
-            if str(user_id) not in allowed_user_ids and 'guests' in usage:
+            allowed_user_ids = self.config.get("allowed_user_ids", [])
+            if isinstance(allowed_user_ids, str):
+                allowed_user_ids = [x.strip() for x in allowed_user_ids.split(",") if x.strip()]
+
+            if str(user_id) not in allowed_user_ids and 'guests' in self.usage:
+
                 usage["guests"].add_chat_tokens(used_tokens, config['token_price'])
 
 
