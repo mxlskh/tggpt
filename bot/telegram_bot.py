@@ -152,6 +152,7 @@ class ChatGPTTelegramBot:
         self.usage = {}
         self.last_message = {}
         self.inline_queries_cache = {}
+        self.usage["guests"] = UsageTracker("guests", "guest users")
 
         self.admin_user_ids = config.get("admin_user_ids", [])
         self.allowed_user_ids = config.get("allowed_user_ids", [])  # Возможно, больше не нужен
