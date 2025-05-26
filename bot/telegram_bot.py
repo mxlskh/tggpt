@@ -119,6 +119,7 @@ class ChatGPTTelegramBot:
         self.db = SupabaseClient()
         self.user_profiles: dict[int, dict[str, str]] = {}  # { user_id: {'role': 'teacher'|'student', 'lang': 'Английский'}, ... }
         bot_language = self.config['bot_language']
+        self.usage["guests"] = UsageTracker("guests", "guest users")
 
         self.commands = [
             BotCommand(command='help', description=localized_text('help_description', bot_language)),
@@ -966,6 +967,9 @@ class ChatGPTTelegramBot:
                 await wrap_with_indicator(update, context, _reply, constants.ChatAction.TYPING)
 
             add_chat_request_to_usage_tracker(self.usage, self.config, user_id, total_tokens)
+            if str(user_id) not in allowed_user_ids and 'guests' in usage:
+                usage["guests"].add_chat_tokens(used_tokens, config['token_price'])
+
 
         except Exception as e:
             logging.exception(e)
