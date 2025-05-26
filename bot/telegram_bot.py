@@ -119,6 +119,7 @@ class ChatGPTTelegramBot:
         self.db = SupabaseClient()
         self.user_profiles: dict[int, dict[str, str]] = {}  # { user_id: {'role': 'teacher'|'student', 'lang': 'Английский'}, ... }
         bot_language = self.config['bot_language']
+        self.usage = {}
         self.usage["guests"] = UsageTracker("guests", "guest users")
 
         self.commands = [
@@ -152,6 +153,7 @@ class ChatGPTTelegramBot:
         self.usage = {}
         self.last_message = {}
         self.inline_queries_cache = {}
+        self.usage = {}
         self.usage["guests"] = UsageTracker("guests", "guest users")
 
         self.admin_user_ids = config.get("admin_user_ids", [])
@@ -1616,8 +1618,11 @@ class ChatGPTTelegramBot:
         self.openai.reset_chat_history(chat_id=chat_id, content=prompt)
 
     async def send_budget_reached_message(self, update, context, is_inline=False):
-        message = "⛔️ Вы использовали лимит запросов в тестовом режиме. Чтобы продолжить, оформите подписку."
+        message = "⛔️ Вы использовали лимит запросов в тестовом режиме. Чтобы продолжить — оформите подписку."
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("💳 Оформить подписку", url="https://yoomoney.ru/to/41001XXXXXXXX")
+        ]])
         if is_inline:
-            await update.inline_query.answer([], switch_pm_text=message, switch_pm_parameter="start", cache_time=0)
+            await update.inline_query.answer([], switch_pm_text="⛔️ Лимит исчерпан", switch_pm_parameter="start", cache_time=0)
         else:
-            await update.message.reply_text(message)
+            await update.message.reply_text(message, reply_markup=keyboard)
