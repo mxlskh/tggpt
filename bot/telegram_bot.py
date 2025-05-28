@@ -115,6 +115,8 @@ class ChatGPTTelegramBot:
         self.supabase = SupabaseClient()
         self.config = config
         self.openai = openai
+        self.free_request_limit = 5
+        self.request_counts: dict[int, int] = {}
         self.supabase = supabase
         self.db = SupabaseClient()
         self.user_profiles: dict[int, dict[str, str]] = {}  # { user_id: {'role': 'teacher'|'student', 'lang': 'Английский'}, ... }
@@ -1231,46 +1233,56 @@ class ChatGPTTelegramBot:
                 text=f"\n\n_{answer_tr}:_\n{localized_answer} {e}", is_inline=True
             )
 
-    async def check_allowed_and_within_budget(
-        self,
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE,
-        is_inline: bool = False
-    ) -> bool:
-        # 0) Вычисляем пользователя и его имя
-        user = update.inline_query.from_user if is_inline else update.message.from_user
-        user_id = user.id
-        user_name = user.username or user.full_name
+        async def check_allowed_and_within_budget(
+            self,
+            update: Update,
+            context: ContextTypes.DEFAULT_TYPE,
+            is_inline: bool = False
+        ) -> bool:
+            # 0) Определяем пользователя
+            user = update.inline_query.from_user if is_inline else update.message.from_user
+            user_id = user.id
+            user_name = user.username or user.full_name
 
-        # 1) Проверяем, одобрен ли пользователь
-        if not self.supabase.is_user_approved(user_id):
-            if is_inline:
-                await update.inline_query.answer(
-                    results=[],
-                    switch_pm_text="⛔️ Доступ запрещён. Подайте заявку.",
-                    switch_pm_parameter="start",
-                    cache_time=0
-                )
-            else:
-                await update.message.reply_text(
-                    "⛔️ Доступ запрещён. Подайте заявку и дождитесь одобрения администратора."
-                )
-            return False
+            # 1) Проверка одобрения администратором
+            if not self.supabase.is_user_approved(user_id):
+                if is_inline:
+                    await update.inline_query.answer(
+                        results=[],
+                        switch_pm_text="⛔️ Доступ запрещён. Подайте заявку.",
+                        switch_pm_parameter="start",
+                        cache_time=0
+                    )
+                else:
+                    await update.message.reply_text(
+                        "⛔️ Доступ запрещён. Подайте заявку и дождитесь одобрения администратора."
+                    )
+                return False
 
-        # 2) Общие права (is_allowed)
-        if not await is_allowed(self.config, update, context, is_inline=is_inline):
-            logging.warning(f'User {user_name} (id: {user_id}) is not allowed to use the bot')
-            await self.send_disallowed_message(update, context, is_inline)
-            return False
+            # 2) Лимит пробных запросов
+            used = self.request_counts.get(user_id, 0)
+            if used >= self.free_request_limit:
+                # лимит исчерпан → показываем кнопку подписки
+                await self.send_budget_reached_message(update, context, is_inline)
+                return False
+            # считаем этот запрос
+            self.request_counts[user_id] = used + 1
 
-        # 3) Бюджет (is_within_budget)
-        if not is_within_budget(self.config, self.usage, update, is_inline=is_inline):
-            logging.warning(f'User {user_name} (id: {user_id}) reached their usage limit')
-            await self.send_budget_reached_message(update, context, is_inline)
-            return False
+            # 3) Общие права (is_allowed)
+            if not await is_allowed(self.config, update, context, is_inline=is_inline):
+                logging.warning(f'User {user_name} (id: {user_id}) is not allowed')
+                await self.send_disallowed_message(update, context, is_inline)
+                return False
 
-        # 4) Всё ок
-        return True
+            # 4) Бюджет OpenAI (is_within_budget)
+            if not is_within_budget(self.config, self.usage, update, is_inline=is_inline):
+                logging.warning(f'User {user_name} (id: {user_id}) reached OpenAI limit')
+                await self.send_budget_reached_message(update, context, is_inline)
+                return False
+
+            # 5) Всё ок
+            return True
+
 
     async def post_init(self, application: Application) -> None:
    
@@ -1622,12 +1634,24 @@ class ChatGPTTelegramBot:
         # Сброс истории чата с новым системным сообщением:
         self.openai.reset_chat_history(chat_id=chat_id, content=prompt)
 
-    async def send_budget_reached_message(self, update, context, is_inline=False):
-        message = "⛔️ Вы использовали лимит запросов в тестовом режиме. Чтобы продолжить — оформите подписку."
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton("💳 Оформить подписку", url="https://yoomoney.ru/to/41001XXXXXXXX")
-        ]])
-        if is_inline:
-            await update.inline_query.answer([], switch_pm_text="⛔️ Лимит исчерпан", switch_pm_parameter="start", cache_time=0)
-        else:
-            await update.message.reply_text(message, reply_markup=keyboard)
+        async def send_budget_reached_message(self, update, context, is_inline=False):
+            # текст предупреждения
+            message = (
+                "⛔️ Вы использовали все 5 бесплатных запросов. "
+                "Чтобы продолжить работу с ботом — оформите подписку."
+            )
+            # ссылка на оплату в YooMoney
+            url = os.getenv('YOOMONEY_URL', 'https://yoomoney.ru/to/41001XXXXXXXX')
+            keyboard = InlineKeyboardMarkup([[
+                InlineKeyboardButton("💳 Оформить подписку", url=url)
+            ]])
+            if is_inline:
+                await update.inline_query.answer(
+                    results=[],
+                    switch_pm_text="⛔️ Лимит исчерпан — оформить подписку",
+                    switch_pm_parameter="start",
+                    cache_time=0
+                )
+            else:
+                await update.message.reply_text(message, reply_markup=keyboard)
+
