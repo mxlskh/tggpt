@@ -192,6 +192,7 @@ class ChatGPTTelegramBot:
         # 2) Лимит пробных запросов
         used = self.request_counts.get(user_id, 0)
         if used >= self.free_request_limit:
+            logging.info(f"Пользователь {user_id} исчерпал лимит ({used} >= {self.free_request_limit})")
             await self.send_budget_reached_message(update, context, is_inline)
             return False
         self.request_counts[user_id] = used + 1
@@ -1631,24 +1632,33 @@ class ChatGPTTelegramBot:
         # Сброс истории чата с новым системным сообщением:
         self.openai.reset_chat_history(chat_id=chat_id, content=prompt)
 
-        async def send_budget_reached_message(self, update, context, is_inline=False):
-            # текст предупреждения
-            message = (
-                "⛔️ Вы использовали все 5 бесплатных запросов. "
-                "Чтобы продолжить работу с ботом — оформите подписку."
-            )
-            # ссылка на оплату в YooMoney
-            url = os.getenv('YOOMONEY_URL', 'https://yoomoney.ru/to/41001XXXXXXXX')
-            keyboard = InlineKeyboardMarkup([[
-                InlineKeyboardButton("💳 Оформить подписку", url=url)
-            ]])
-            if is_inline:
-                await update.inline_query.answer(
-                    results=[],
-                    switch_pm_text="⛔️ Лимит исчерпан — оформить подписку",
-                    switch_pm_parameter="start",
-                    cache_time=0
-                )
-            else:
-                await update.message.reply_text(message, reply_markup=keyboard)
+    async def send_budget_reached_message(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        is_inline: bool = False
+    ):
+        # Получаем ссылку на YooMoney из конфига/переменной окружения
+        url = os.getenv(
+            "YOOMONEY_URL",
+            "https://yoomoney.ru/to/41001YOUR_ACCOUNT_ID"
+        )
+        text = (
+            "⛔️ Вы исчерпали все бесплатные запросы.\n"
+            "Чтобы продолжить работу с ботом — оформите подписку:"
+        )
+        buttons = InlineKeyboardMarkup([[
+            InlineKeyboardButton("💳 Оформить подписку", url=url)
+        ]])
 
+        if is_inline:
+            # для inline-запросов покажем кнопку перехода в чат с ботом
+            await update.inline_query.answer(
+                results=[],
+                switch_pm_text="⛔️ Лимит исчерпан — оформить подписку",
+                switch_pm_parameter="start",
+                cache_time=0
+            )
+        else:
+            # в обычном чате отвечаем текстом + клавиатурой
+            await update.message.reply_text(text, reply_markup=buttons)
