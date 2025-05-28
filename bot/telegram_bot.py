@@ -1411,25 +1411,14 @@ class ChatGPTTelegramBot:
 
         # 1) Список участников
         if data == "admin_list_users":
-    # Получаем всех пользователей из Supabase
             users = self.supabase.get_users()
-
-    # Формируем клавиатуру: для каждого user_id — кнопка блокировки + подпись
             keyboard = []
             for uid, rec in users.items():
                 username = rec.get("username", "Без имени")
                 keyboard.append([
-                    InlineKeyboardButton(
-                        "🚫 Заблокировать",
-                        callback_data=f"block_user_{uid}"
-                    ),
-                    InlineKeyboardButton(
-                        f"{username} ({uid})",
-                        callback_data="noop"
-                    )
+                    InlineKeyboardButton("🚫 Заблокировать", callback_data=f"block_user_{uid}"),
+                    InlineKeyboardButton(f"{username} ({uid})", callback_data="noop")
                 ])
-
-    # Если пользователей нет, просто выводим сообщение
             if not keyboard:
                 await query.edit_message_text("Нет участников.")
             else:
@@ -1448,18 +1437,30 @@ class ChatGPTTelegramBot:
 
             keyboard = []
             for uid, info in requests.items():
+                username = info.get("username")
+                if username:
+                    mention_btn = InlineKeyboardButton(
+                        text=f"@{username}",
+                        url=f"tg://user?id={uid}"
+                    )
+                else:
+                    mention_btn = InlineKeyboardButton(
+                        text=info.get("name", "Без имени"),
+                        callback_data="noop"
+                    )
                 keyboard.append([
                     InlineKeyboardButton("✅", callback_data=f"approve_request_{uid}"),
                     InlineKeyboardButton("❌", callback_data=f"reject_request_{uid}"),
-                    InlineKeyboardButton(f"{info.get('username')} ({uid})", callback_data="noop")
+                    mention_btn
                 ])
+
             await query.edit_message_text(
                 "📝 Заявки на вступление:",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
             return
 
-        # 3) Заблокированные
+        # 3) Заблокированные пользователи
         if data == "admin_blocked_users":
             blocked = self.supabase.get_blocked_users()
             if not blocked:
@@ -1468,19 +1469,16 @@ class ChatGPTTelegramBot:
 
             keyboard = []
             text_lines = []
-
             for user in blocked:
                 uid = user.get("user_id")
                 username = user.get("username") or "Без имени"
                 text_lines.append(f"{uid} — {username}")
                 keyboard.append([
-                    InlineKeyboardButton(f"🔓 Разблокировать", callback_data=f"unblock_user_{uid}")
+                    InlineKeyboardButton("🔓 Разблокировать", callback_data=f"unblock_user_{uid}")
                 ])
-
             text = "🚫 Заблокированные пользователи:\n\n" + "\n".join(text_lines)
             await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
             return
-
 
         # 4) Одобрить заявку
         if data.startswith("approve_request_"):
@@ -1488,7 +1486,6 @@ class ChatGPTTelegramBot:
             user_id = int(str_uid)
             requests = self.supabase.get_requests()
             username = requests.get(str_uid, {}).get("username", "")
-
             try:
                 self.supabase.approve_user(user_id, username)
                 await context.bot.send_message(
@@ -1516,31 +1513,9 @@ class ChatGPTTelegramBot:
                 logging.error(f"Ошибка при отклонении заявки: {e}")
                 await query.answer("❗️Не удалось отклонить заявку.", show_alert=True)
             return
-        elif data == "admin_blocked_users":
-            blocked = self.supabase.get_blocked_users()
-            if not blocked:
-                await query.edit_message_text("Заблокированных пользователей нет.")
-                return
 
-            keyboard = []
-            for user_id in blocked:
-                keyboard.append([
-                    InlineKeyboardButton(f"🔓 Разблокировать {user_id}", callback_data=f"unblock_user_{user_id}")
-                ])
-            await query.edit_message_text(
-                "🚫 Заблокированные пользователи:",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-            return
-
-
-        elif data.startswith("unblock_user_"):
-            user_id = data.split("_")[-1]
-            self.supabase.unblock_user(user_id)
-            await query.edit_message_text("Пользователь разблокирован.")
-            return
-
-        elif data.startswith("block_user_"):
+        # 6) Блокировка/разблокировка пользователей
+        if data.startswith("block_user_"):
             str_uid = data.split("_")[-1]
             user_id = int(str_uid)
             try:
@@ -1555,6 +1530,13 @@ class ChatGPTTelegramBot:
                 await query.answer("❗️Не удалось заблокировать пользователя.", show_alert=True)
             return
 
+        if data.startswith("unblock_user_"):
+            user_id = int(data.split("_")[-1])
+            self.supabase.unblock_user(user_id)
+            await query.edit_message_text("Пользователь разблокирован.")
+            return
+
+        # 7) Прочие админские случаи
         if data == 'admin_approve':
             await query.edit_message_text("✅ Заявка одобрена.")
         elif data == 'admin_reject':
