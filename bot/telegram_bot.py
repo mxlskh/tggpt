@@ -189,23 +189,28 @@ class ChatGPTTelegramBot:
                 )
             return False
 
-        # 2) Лимит пробных запросов
-        used = self.request_counts.get(user_id, 0)
-        if used >= self.free_request_limit:
-            logging.info(f"Пользователь {user_id} исчерпал лимит ({used} >= {self.free_request_limit})")
-            await self.send_budget_reached_message(update, context, is_inline)
-            return False
-        self.request_counts[user_id] = used + 1
+        # 2) Если пользователь не оплатил — применяем лимит пробных запросов
+        if not self.supabase.is_user_paid(user_id):
+            used = self.request_counts.get(user_id, 0)
+            if used >= self.free_request_limit:
+                logging.info(
+                    f"Пользователь {user_id} исчерпал пробный лимит "
+                    f"({used} из {self.free_request_limit})"
+                )
+                await self.send_budget_reached_message(update, context, is_inline)
+                return False
+            # учитываем этот запрос
+            self.request_counts[user_id] = used + 1
 
-        # 3) Общие права (is_allowed)
+        # 3) Проверка общих прав (is_allowed)
         if not await is_allowed(self.config, update, context, is_inline=is_inline):
-            logging.warning(f'User {user_name} (id: {user_id}) is not allowed')
+            logging.warning(f"User {user_name} (id: {user_id}) не имеет прав")
             await self.send_disallowed_message(update, context, is_inline)
             return False
 
-        # 4) Бюджет OpenAI (is_within_budget)
+        # 4) Проверка бюджета OpenAI (is_within_budget)
         if not is_within_budget(self.config, self.usage, update, is_inline=is_inline):
-            logging.warning(f'User {user_name} (id: {user_id}) reached OpenAI limit')
+            logging.warning(f"User {user_name} (id: {user_id}) достиг лимита OpenAI")
             await self.send_budget_reached_message(update, context, is_inline)
             return False
 

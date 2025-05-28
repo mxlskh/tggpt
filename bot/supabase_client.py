@@ -76,7 +76,6 @@ class SupabaseClient:
             print(f"[ERROR] get_blocked_users: {e}")
             return []
 
-
     def add_join_request(self, user_id: int, username: str):
         try:
             self.client.table("join_requests").insert({
@@ -139,9 +138,35 @@ class SupabaseClient:
         except Exception as e:
             print(f"[ERROR] block_user: {e}")
 
-
     def unblock_user(self, user_id: int):
         try:
             self.client.table("blocked_users").delete().eq("user_id", user_id).execute()
         except Exception as e:
             print(f"[ERROR] unblock_user: {e}")
+
+    def is_user_paid(self, user_id: int) -> bool:
+        """
+        Возвращает True, если пользователь оплатил подписку (paid == true).
+        """
+        try:
+            resp = (
+                self.client
+                    .table("users")
+                    .select("paid")
+                    .eq("user_id", user_id)
+                    .execute()
+            )
+            data = resp.data
+            return bool(data and data[0].get("paid") is True)
+        except Exception as e:
+            print(f"[ERROR] is_user_paid: {e}")
+            return False
+
+    def mark_user_paid(self, user_id: int):
+        """
+        Помечает в базе пользователя как оплатившего подписку.
+        """
+        try:
+            self.client.table("users").update({"paid": True}).eq("user_id", user_id).execute()
+        except Exception as e:
+            print(f"[ERROR] mark_user_paid: {e}")
