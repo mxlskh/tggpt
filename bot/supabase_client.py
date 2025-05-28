@@ -153,7 +153,7 @@ class SupabaseClient:
                 self.client
                     .table("users")
                     .select("paid")
-                    .eq("user_id", user_id)
+                    .eq("id", str(user_id))
                     .execute()
             )
             data = resp.data
@@ -167,6 +167,11 @@ class SupabaseClient:
         Помечает в базе пользователя как оплатившего подписку.
         """
         try:
-            self.client.table("users").update({"paid": True}).eq("user_id", user_id).execute()
+            # обновляем запись по полю `id`
+            self.client \
+                .table("users") \
+                .update({"paid": True}) \
+                .eq("id", str(user_id)) \
+                .execute()
         except Exception as e:
             print(f"[ERROR] mark_user_paid: {e}")
