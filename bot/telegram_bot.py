@@ -163,6 +163,54 @@ class ChatGPTTelegramBot:
         self.DATA_DIR = "data"
         os.makedirs(self.DATA_DIR, exist_ok=True)
 
+    async def check_allowed_and_within_budget(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        is_inline: bool = False
+    ) -> bool:
+        # 0) Определяем пользователя
+        user = update.inline_query.from_user if is_inline else update.message.from_user
+        user_id = user.id
+        user_name = user.username or user.full_name
+
+        # 1) Проверка одобрения администратором
+        if not self.supabase.is_user_approved(user_id):
+            if is_inline:
+                await update.inline_query.answer(
+                    results=[],
+                    switch_pm_text="⛔️ Доступ запрещён. Подайте заявку.",
+                    switch_pm_parameter="start",
+                    cache_time=0
+                )
+            else:
+                await update.message.reply_text(
+                    "⛔️ Доступ запрещён. Подайте заявку и дождитесь одобрения администратора."
+                )
+            return False
+
+        # 2) Лимит пробных запросов
+        used = self.request_counts.get(user_id, 0)
+        if used >= self.free_request_limit:
+            await self.send_budget_reached_message(update, context, is_inline)
+            return False
+        self.request_counts[user_id] = used + 1
+
+        # 3) Общие права (is_allowed)
+        if not await is_allowed(self.config, update, context, is_inline=is_inline):
+            logging.warning(f'User {user_name} (id: {user_id}) is not allowed')
+            await self.send_disallowed_message(update, context, is_inline)
+            return False
+
+        # 4) Бюджет OpenAI (is_within_budget)
+        if not is_within_budget(self.config, self.usage, update, is_inline=is_inline):
+            logging.warning(f'User {user_name} (id: {user_id}) reached OpenAI limit')
+            await self.send_budget_reached_message(update, context, is_inline)
+            return False
+
+        # 5) Всё ок
+        return True
+
     def get_users_list_text(self):
         response = self.client.table("users").select("*").execute()
         users = response.data
@@ -1232,57 +1280,6 @@ class ChatGPTTelegramBot:
                 context, chat_id=None, message_id=inline_message_id,
                 text=f"\n\n_{answer_tr}:_\n{localized_answer} {e}", is_inline=True
             )
-
-        async def check_allowed_and_within_budget(
-            self,
-            update: Update,
-            context: ContextTypes.DEFAULT_TYPE,
-            is_inline: bool = False
-        ) -> bool:
-            # 0) Определяем пользователя
-            user = update.inline_query.from_user if is_inline else update.message.from_user
-            user_id = user.id
-            user_name = user.username or user.full_name
-
-            # 1) Проверка одобрения администратором
-            if not self.supabase.is_user_approved(user_id):
-                if is_inline:
-                    await update.inline_query.answer(
-                        results=[],
-                        switch_pm_text="⛔️ Доступ запрещён. Подайте заявку.",
-                        switch_pm_parameter="start",
-                        cache_time=0
-                    )
-                else:
-                    await update.message.reply_text(
-                        "⛔️ Доступ запрещён. Подайте заявку и дождитесь одобрения администратора."
-                    )
-                return False
-
-            # 2) Лимит пробных запросов
-            used = self.request_counts.get(user_id, 0)
-            if used >= self.free_request_limit:
-                # лимит исчерпан → показываем кнопку подписки
-                await self.send_budget_reached_message(update, context, is_inline)
-                return False
-            # считаем этот запрос
-            self.request_counts[user_id] = used + 1
-
-            # 3) Общие права (is_allowed)
-            if not await is_allowed(self.config, update, context, is_inline=is_inline):
-                logging.warning(f'User {user_name} (id: {user_id}) is not allowed')
-                await self.send_disallowed_message(update, context, is_inline)
-                return False
-
-            # 4) Бюджет OpenAI (is_within_budget)
-            if not is_within_budget(self.config, self.usage, update, is_inline=is_inline):
-                logging.warning(f'User {user_name} (id: {user_id}) reached OpenAI limit')
-                await self.send_budget_reached_message(update, context, is_inline)
-                return False
-
-            # 5) Всё ок
-            return True
-
 
     async def post_init(self, application: Application) -> None:
    
