@@ -1,4 +1,4 @@
-# Telegram AI Assistant based on ChatGPT by OpenAI. 
+# Lingro on Telegram. 
 ![telegram](https://img.shields.io/badge/Telegram-Bot?style=flat&logo=Telegram&logoColor=24A1DE&logoSize=auto&labelColor=000000&color=000000)
 [![license](https://img.shields.io/badge/GPL2.0-Bot?style=flat&logo=github&logoColor=ffffffffffff&logoSize=auto&label=License&labelColor=000000&color=FF0000)](LICENSE)
 ![python](https://img.shields.io/badge/Python-bot?style=flat&logo=python&logoColor=%23ffffff&color=000000)
